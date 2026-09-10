@@ -1,0 +1,918 @@
+<title>Nordre Øyeren</title>
+<link rel="stylesheet" href="https://js.arcgis.com/4.34/esri/themes/light/main.css">
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --text: #1c1c1c;
+    --text-muted: #6b6b6b;
+    --border: #e2e2e0;
+    --accent: #2f6f4f;
+    --accent-hover: #255a40;
+    --error: #b3261e;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overflow: hidden;
+  }
+
+  #viewDiv {
+    position: fixed;
+    inset: 0;
+  }
+
+  [hidden] { display: none !important; }
+
+  /* ---------------- Floating buttons ---------------- */
+  .fab {
+    position: fixed;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    color: var(--text);
+  }
+
+  .fab svg { width: 22px; height: 22px; }
+
+  #menu-btn { top: 60px; left: 16px; }
+
+  #locate-btn { right: 16px; bottom: 88px; }
+  #locate-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  #camera-btn {
+    right: 16px;
+    bottom: 24px;
+    width: 56px;
+    height: 56px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+  }
+  #camera-btn svg { width: 25px; height: 25px; }
+
+  /* ---------------- Side menu ---------------- */
+  #menu-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.15);
+    z-index: 29;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  #menu-overlay.open { opacity: 1; pointer-events: auto; }
+
+  #side-menu {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 268px;
+    max-width: 78vw;
+    background: rgba(255,255,255,0.62);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    backdrop-filter: blur(18px) saturate(160%);
+    z-index: 30;
+    box-shadow: 2px 0 16px rgba(0,0,0,0.12);
+    transform: translateX(-104%);
+    transition: transform 0.22s ease;
+    overflow-y: auto;
+    padding: 18px 18px 30px;
+  }
+  #side-menu.open { transform: translateX(0); }
+
+  /* Fallback for browsers without backdrop-filter support: keep it legible */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    #side-menu { background: rgba(255,255,255,0.97); }
+  }
+
+  #side-menu h1 {
+    font-size: 1.15rem;
+    margin: 4px 0 20px;
+  }
+
+  .menu-section {
+    margin-bottom: 22px;
+  }
+
+  .menu-section .section-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+
+  .layer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    font-size: 0.94rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .layer-row:last-child { border-bottom: none; }
+
+  .switch {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .track {
+    position: absolute;
+    inset: 0;
+    background: #cfcfcb;
+    border-radius: 24px;
+    transition: background 0.15s ease;
+    cursor: pointer;
+  }
+  .switch .track::before {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  }
+  .switch input:checked + .track { background: var(--accent); }
+  .switch input:checked + .track::before { transform: translateX(18px); }
+
+  .basemap-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    font-size: 0.94rem;
+    cursor: pointer;
+  }
+  .basemap-option input { accent-color: var(--accent); width: 17px; height: 17px; }
+
+  .menu-btn-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .menu-btn-row svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-muted); }
+
+  .menu-hint {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 8px;
+    line-height: 1.4;
+  }
+
+  /* ---------------- Report modal (bottom sheet) ---------------- */
+  #report-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 39;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  #report-overlay.open { opacity: 1; pointer-events: auto; }
+
+  #report-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 88vh;
+    background: var(--surface);
+    z-index: 40;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.2);
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    padding: 10px 18px 26px;
+  }
+  #report-sheet.open { transform: translateY(0); }
+
+  .sheet-handle {
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 4px;
+    margin: 6px auto 14px;
+  }
+
+  .sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .sheet-header h2 { font-size: 1.05rem; margin: 0; }
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.3rem;
+    line-height: 1;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  .field-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+
+  .photo-input { display: none; }
+
+  .photo-dropzone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 24px 16px;
+    text-align: center;
+    cursor: pointer;
+  }
+  .photo-dropzone:active { background: #f0f0ee; }
+  .photo-dropzone svg { width: 28px; height: 28px; color: var(--text-muted); }
+  .photo-dropzone .label { font-weight: 600; font-size: 0.95rem; }
+  .photo-dropzone .hint { font-size: 0.8rem; color: var(--text-muted); }
+
+  .photo-preview-wrap { position: relative; }
+  .photo-preview {
+    width: 100%;
+    border-radius: var(--radius);
+    display: block;
+    max-height: 260px;
+    object-fit: cover;
+  }
+  .photo-retake {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    padding: 7px 14px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .location-row { display: flex; align-items: center; gap: 10px; font-size: 0.88rem; }
+  .location-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+  .location-dot.ok { background: var(--accent); }
+  .location-dot.err { background: var(--error); }
+  .location-dot.pending { background: #c9a227; animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .location-text { color: var(--text-muted); }
+  .location-text .coords { color: var(--text); font-variant-numeric: tabular-nums; }
+  .retry-link { margin-left: auto; background: none; border: none; color: var(--accent); font-size: 0.85rem; font-weight: 600; cursor: pointer; padding: 4px; }
+
+  textarea {
+    width: 100%;
+    min-height: 80px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    resize: vertical;
+    background: var(--surface);
+    color: var(--text);
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+
+  .submit-btn {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 12px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .submit-btn:disabled { background: #b9c4bd; cursor: not-allowed; }
+
+  .status-msg { margin-top: 12px; font-size: 0.88rem; text-align: center; line-height: 1.5; }
+  .status-msg.success { color: var(--accent); }
+  .status-msg.error { color: var(--error); }
+
+  .spinner {
+    display: inline-block;
+    width: 15px; height: 15px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: -3px;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .done-screen { text-align: center; padding: 30px 10px 10px; }
+  .done-screen .check {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 14px; font-size: 1.5rem;
+  }
+  .done-screen h2 { margin: 0 0 6px; font-size: 1.1rem; }
+  .done-screen p { color: var(--text-muted); margin: 0 0 20px; font-size: 0.9rem; }
+  .again-btn {
+    background: none; border: 1.5px solid var(--border); border-radius: 10px;
+    padding: 11px 20px; font-size: 0.92rem; font-weight: 600; color: var(--text); cursor: pointer;
+  }
+</style>
+
+<div id="viewDiv"></div>
+
+<!-- Floating controls -->
+<button class="fab" id="menu-btn" aria-label="Meny">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+</button>
+
+<button class="fab" id="locate-btn" aria-label="Vis min posisjon">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
+</button>
+
+<button class="fab" id="camera-btn" aria-label="Rapporter observasjon">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"></path>
+    <circle cx="12" cy="13" r="4"></circle>
+  </svg>
+</button>
+
+<!-- Side menu -->
+<div id="menu-overlay"></div>
+<nav id="side-menu">
+  <h1>Nordre Øyeren</h1>
+
+  <div class="menu-section">
+    <div class="section-label">Lag</div>
+    <div class="layer-row">
+      <span>Led</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-led" checked>
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="layer-row">
+      <span>Bilder</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-bilder" checked>
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="layer-row">
+      <span>Nordre Øyeren naturreservat</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-papirkart">
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="layer-row">
+      <span>Innsjødatabase (NVE)</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-nve" checked>
+        <span class="track"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="menu-section">
+    <div class="section-label">Bakgrunnskart</div>
+    <div id="basemap-list"></div>
+  </div>
+
+  <div class="menu-section">
+    <div class="section-label">Posisjon</div>
+    <button type="button" class="menu-btn-row" id="menu-zoom-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
+      Zoom til min posisjon
+    </button>
+    <p class="menu-hint">Nettleseren vil be om tillatelse til å dele posisjonen din første gang du bruker dette.</p>
+  </div>
+</nav>
+
+<!-- Report bottom sheet -->
+<div id="report-overlay"></div>
+<div id="report-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <h2>Rapporter observasjon</h2>
+    <button type="button" class="close-btn" id="report-close">✕</button>
+  </div>
+
+  <form id="report-form">
+    <div class="card">
+      <span class="field-label">Bilde</span>
+      <input class="photo-input" type="file" id="photo-input" accept="image/*" capture="environment">
+      <div class="photo-dropzone" id="photo-dropzone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"></path>
+          <circle cx="12" cy="13" r="4"></circle>
+        </svg>
+        <span class="label">Ta bilde</span>
+        <span class="hint">Trykk for å åpne kamera</span>
+      </div>
+      <div class="photo-preview-wrap" id="photo-preview-wrap" hidden>
+        <img class="photo-preview" id="photo-preview" alt="Forhåndsvisning av bilde">
+        <button type="button" class="photo-retake" id="photo-retake">Ta nytt</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Posisjon</span>
+      <div class="location-row">
+        <span class="location-dot pending" id="location-dot"></span>
+        <span class="location-text" id="location-text">Henter posisjon…</span>
+        <button type="button" class="retry-link" id="location-retry" hidden>Prøv igjen</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Kommentar (valgfritt)</span>
+      <textarea id="comment-input" placeholder="Skriv en kort kommentar…" maxlength="1000"></textarea>
+    </div>
+
+    <button type="submit" class="submit-btn" id="submit-btn" disabled>Send inn</button>
+    <div class="status-msg" id="status-msg"></div>
+  </form>
+
+  <div class="done-screen" id="done-screen" hidden>
+    <div class="check">✓</div>
+    <h2>Takk for rapporten!</h2>
+    <p>Bildet og kommentaren din er sendt inn.</p>
+    <button type="button" class="again-btn" id="again-btn">Send inn en ny</button>
+  </div>
+</div>
+
+<script src="https://js.arcgis.com/4.34/"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------------
+  // KONFIGURASJON
+  // ---------------------------------------------------------------------
+  const WEBMAP_ID = "d275f3cbd6be4f6f9a3196e1ecd3d202";
+
+  const LAYER_TITLES = {
+    led: "LedOyeren",
+    bilder: "BilderInnsjo",
+    papirkart: "Nordre_Oyeren_tif",
+    nve: "Innsjodatabase2"
+  };
+
+  // Bakgrunnskart å veksle mellom (hentet fra Geodata sitt UTM33-basemap-galleri).
+  const BASEMAPS = [
+    {
+      title: "Flyfoto (GeocacheBilder)",
+      type: "tile",
+      url: "https://services.geodataonline.no/arcgis/rest/services/Geocache_UTM33_EUREF89/GeocacheBilder/MapServer"
+    },
+    {
+      title: "Gråtone - Vector Tiles",
+      type: "vector",
+      styleUrl: "https://services.geodataonline.no/arcgis/rest/services/GeocacheVector/GeocacheGraatone/VectorTileServer/resources/styles/root.json"
+    },
+    {
+      title: "Basis Terreng Norden Vektor (UTM33)",
+      type: "vector-multi",
+      styleUrls: [
+        "https://services.geodataonline.no/arcgis/rest/services/GeocacheVector/GeocacheOSMBasis/VectorTileServer/resources/styles/root.json",
+        "https://services.geodataonline.no/arcgis/rest/services/GeocacheVector/GeocacheBasisTerreng/VectorTileServer/resources/styles/root.json"
+      ]
+    }
+  ];
+
+  const REPORT_CONFIG = {
+    featureLayerUrl: "https://services.arcgis.com/2JyTvMWQSnM2Vi8q/arcgis/rest/services/BilderInnsjo/FeatureServer/0",
+    commentField: "Kommentar",
+    maxImageDimension: 1600,
+    jpegQuality: 0.75
+  };
+
+  // ---------------------------------------------------------------------
+  // Side-meny åpne/lukke (uavhengig av kartet)
+  // ---------------------------------------------------------------------
+  const menuBtn = document.getElementById("menu-btn");
+  const sideMenu = document.getElementById("side-menu");
+  const menuOverlay = document.getElementById("menu-overlay");
+
+  function openMenu() { sideMenu.classList.add("open"); menuOverlay.classList.add("open"); }
+  function closeMenu() { sideMenu.classList.remove("open"); menuOverlay.classList.remove("open"); }
+
+  menuBtn.addEventListener("click", openMenu);
+  menuOverlay.addEventListener("click", closeMenu);
+
+  // ---------------------------------------------------------------------
+  // Rapport-skjema / bunn-ark (uavhengig av kartet)
+  // ---------------------------------------------------------------------
+  const cameraBtn = document.getElementById("camera-btn");
+  const reportOverlay = document.getElementById("report-overlay");
+  const reportSheet = document.getElementById("report-sheet");
+  const reportClose = document.getElementById("report-close");
+
+  const form = document.getElementById("report-form");
+  const photoInput = document.getElementById("photo-input");
+  const photoDropzone = document.getElementById("photo-dropzone");
+  const photoPreviewWrap = document.getElementById("photo-preview-wrap");
+  const photoPreview = document.getElementById("photo-preview");
+  const photoRetake = document.getElementById("photo-retake");
+  const locationDot = document.getElementById("location-dot");
+  const locationText = document.getElementById("location-text");
+  const locationRetry = document.getElementById("location-retry");
+  const commentInput = document.getElementById("comment-input");
+  const submitBtn = document.getElementById("submit-btn");
+  const statusMsg = document.getElementById("status-msg");
+  const doneScreen = document.getElementById("done-screen");
+  const againBtn = document.getElementById("again-btn");
+
+  let reportState = { imageBlob: null, position: null, submitting: false };
+
+  function openReport() {
+    reportOverlay.classList.add("open");
+    reportSheet.classList.add("open");
+    requestReportLocation();
+  }
+  function closeReport() {
+    reportOverlay.classList.remove("open");
+    reportSheet.classList.remove("open");
+  }
+
+  cameraBtn.addEventListener("click", openReport);
+  reportClose.addEventListener("click", closeReport);
+  reportOverlay.addEventListener("click", closeReport);
+
+  function requestReportLocation() {
+    reportState.position = null;
+    locationDot.className = "location-dot pending";
+    locationText.textContent = "Henter posisjon…";
+    locationRetry.hidden = true;
+    updateSubmitState();
+
+    if (!("geolocation" in navigator)) {
+      locationDot.className = "location-dot err";
+      locationText.textContent = "Posisjon støttes ikke i denne nettleseren.";
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      function (pos) {
+        reportState.position = { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        locationDot.className = "location-dot ok";
+        locationText.innerHTML = "Posisjon funnet <span class=\"coords\">(±" + Math.round(pos.coords.accuracy) + " m)</span>";
+        updateSubmitState();
+      },
+      function (err) {
+        locationDot.className = "location-dot err";
+        locationText.textContent = err.code === err.PERMISSION_DENIED
+          ? "Posisjon avslått. Gi tilgang i nettleserinnstillinger."
+          : "Fikk ikke posisjon.";
+        locationRetry.hidden = false;
+        updateSubmitState();
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }
+  locationRetry.addEventListener("click", requestReportLocation);
+
+  photoDropzone.addEventListener("click", function () { photoInput.click(); });
+  photoRetake.addEventListener("click", function () { photoInput.click(); });
+
+  photoInput.addEventListener("change", function () {
+    const file = photoInput.files && photoInput.files[0];
+    if (!file) return;
+    compressImage(file, REPORT_CONFIG.maxImageDimension, REPORT_CONFIG.jpegQuality).then(function (blob) {
+      reportState.imageBlob = blob;
+      photoPreview.src = URL.createObjectURL(blob);
+      photoPreviewWrap.hidden = false;
+      photoDropzone.hidden = true;
+      updateSubmitState();
+    }).catch(function () {
+      showStatus("Klarte ikke å lese bildet. Prøv igjen.", "error");
+    });
+  });
+
+  function compressImage(file, maxDim, quality) {
+    return new Promise(function (resolve, reject) {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        img.onload = function () {
+          let w = img.width, h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round(h * (maxDim / w)); w = maxDim; }
+            else { w = Math.round(w * (maxDim / h)); h = maxDim; }
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, w, h);
+          canvas.toBlob(function (blob) {
+            if (blob) resolve(blob); else reject(new Error("toBlob failed"));
+          }, "image/jpeg", quality);
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function updateSubmitState() {
+    submitBtn.disabled = !(reportState.imageBlob && reportState.position) || reportState.submitting;
+  }
+  function showStatus(text, kind) {
+    statusMsg.textContent = text;
+    statusMsg.className = "status-msg" + (kind ? " " + kind : "");
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!reportState.imageBlob || !reportState.position || reportState.submitting) return;
+
+    reportState.submitting = true;
+    updateSubmitState();
+    submitBtn.innerHTML = "<span class=\"spinner\"></span>Sender inn…";
+    showStatus("", "");
+
+    submitReport()
+      .then(function () {
+        form.reset();
+        photoPreviewWrap.hidden = true;
+        photoDropzone.hidden = false;
+        reportState.imageBlob = null;
+        form.hidden = true;
+        doneScreen.hidden = false;
+      })
+      .catch(function (err) {
+        console.error(err);
+        showStatus("Noe gikk galt ved innsending. Prøv igjen.", "error");
+      })
+      .finally(function () {
+        reportState.submitting = false;
+        submitBtn.textContent = "Send inn";
+        updateSubmitState();
+      });
+  });
+
+  againBtn.addEventListener("click", function () {
+    doneScreen.hidden = true;
+    form.hidden = false;
+    commentInput.value = "";
+    requestReportLocation();
+  });
+
+  async function submitReport() {
+    const attrs = {};
+    const comment = commentInput.value.trim();
+    if (comment) attrs[REPORT_CONFIG.commentField] = comment;
+
+    const feature = {
+      geometry: {
+        x: reportState.position.lon,
+        y: reportState.position.lat,
+        spatialReference: { wkid: 4326 }
+      },
+      attributes: attrs
+    };
+
+    const addBody = new URLSearchParams();
+    addBody.set("f", "json");
+    addBody.set("features", JSON.stringify([feature]));
+
+    const addResp = await fetch(REPORT_CONFIG.featureLayerUrl + "/addFeatures", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: addBody.toString()
+    });
+    const addJson = await addResp.json();
+    if (addJson.error) throw new Error("addFeatures: " + (addJson.error.message || JSON.stringify(addJson.error)));
+    const result = addJson.addResults && addJson.addResults[0];
+    if (!result || !result.success) throw new Error("addFeatures: innsending feilet (" + JSON.stringify(result) + ")");
+
+    const objectId = result.objectId;
+    const attachForm = new FormData();
+    attachForm.set("f", "json");
+    attachForm.set("attachment", reportState.imageBlob, "observasjon.jpg");
+
+    const attachResp = await fetch(REPORT_CONFIG.featureLayerUrl + "/" + objectId + "/addAttachment", {
+      method: "POST",
+      body: attachForm
+    });
+    const attachJson = await attachResp.json();
+    if (attachJson.error || !(attachJson.addAttachmentResult && attachJson.addAttachmentResult.success)) {
+      throw new Error("addAttachment feilet: " + JSON.stringify(attachJson));
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Kart (ArcGIS Maps SDK for JavaScript) — feiler dette, virker resten av appen fortsatt
+  // ---------------------------------------------------------------------
+  if (typeof require === "function") {
+    require([
+      "esri/WebMap",
+      "esri/views/MapView",
+      "esri/Graphic",
+      "esri/geometry/Point",
+      "esri/layers/GraphicsLayer",
+      "esri/layers/TileLayer",
+      "esri/layers/VectorTileLayer",
+      "esri/Basemap"
+    ], function (WebMap, MapView, Graphic, Point, GraphicsLayer, TileLayer, VectorTileLayer, Basemap) {
+
+      const webmap = new WebMap({
+        portalItem: { id: WEBMAP_ID }
+      });
+
+      const view = new MapView({
+        container: "viewDiv",
+        map: webmap
+      });
+
+      const locationGraphicsLayer = new GraphicsLayer({ title: "Min posisjon" });
+      view.map.add(locationGraphicsLayer);
+
+      // Flytt kartets innebygde zoom-knapper vekk fra øverste venstre hjørne,
+      // slik at de ikke kolliderer med hamburgermeny-knappen (#menu-btn).
+      view.ui.move("zoom", "top-right");
+
+      let layerRefs = {};
+
+      view.when(function () {
+        webmap.layers.forEach(function (layer) {
+          Object.keys(LAYER_TITLES).forEach(function (key) {
+            if (layer.title === LAYER_TITLES[key]) {
+              layerRefs[key] = layer;
+            }
+          });
+        });
+
+        // Synkroniser bryterne med lagenes faktiske synlighet i web-kartet
+        if (layerRefs.led) document.getElementById("toggle-led").checked = layerRefs.led.visible;
+        if (layerRefs.bilder) document.getElementById("toggle-bilder").checked = layerRefs.bilder.visible;
+        if (layerRefs.papirkart) document.getElementById("toggle-papirkart").checked = layerRefs.papirkart.visible;
+        if (layerRefs.nve) document.getElementById("toggle-nve").checked = layerRefs.nve.visible;
+      }, function (err) {
+        console.error("Kunne ikke laste web-kartet", err);
+      });
+
+      document.getElementById("toggle-led").addEventListener("change", function (e) {
+        if (layerRefs.led) layerRefs.led.visible = e.target.checked;
+      });
+      document.getElementById("toggle-bilder").addEventListener("change", function (e) {
+        if (layerRefs.bilder) layerRefs.bilder.visible = e.target.checked;
+      });
+      document.getElementById("toggle-papirkart").addEventListener("change", function (e) {
+        if (layerRefs.papirkart) layerRefs.papirkart.visible = e.target.checked;
+      });
+      document.getElementById("toggle-nve").addEventListener("change", function (e) {
+        if (layerRefs.nve) layerRefs.nve.visible = e.target.checked;
+      });
+
+      // ---------------- Basemap-veksling ----------------
+      const basemapList = document.getElementById("basemap-list");
+      BASEMAPS.forEach(function (bm, i) {
+        const wrap = document.createElement("label");
+        wrap.className = "basemap-option";
+        wrap.innerHTML =
+          '<input type="radio" name="basemap" value="' + i + '"' + (i === 0 ? " checked" : "") + '>' +
+          '<span>' + bm.title + '</span>';
+        basemapList.appendChild(wrap);
+      });
+
+      function buildBasemap(bm) {
+        if (bm.type === "tile") {
+          return new Basemap({ baseLayers: [new TileLayer({ url: bm.url })] });
+        }
+        if (bm.type === "vector") {
+          return new Basemap({ baseLayers: [new VectorTileLayer({ url: bm.styleUrl })] });
+        }
+        if (bm.type === "vector-multi") {
+          return new Basemap({ baseLayers: bm.styleUrls.map(function (u) { return new VectorTileLayer({ url: u }); }) });
+        }
+        return null;
+      }
+
+      basemapList.addEventListener("change", function (e) {
+        const bm = BASEMAPS[parseInt(e.target.value, 10)];
+        if (!bm) return;
+        const newBasemap = buildBasemap(bm);
+        if (newBasemap) view.map.basemap = newBasemap;
+      });
+
+      // ---------------- Zoom til min posisjon ----------------
+      function zoomToMyLocation() {
+        if (!("geolocation" in navigator)) return;
+        navigator.geolocation.getCurrentPosition(function (pos) {
+          view.goTo({
+            target: new Point({
+              longitude: pos.coords.longitude,
+              latitude: pos.coords.latitude,
+              spatialReference: { wkid: 4326 }
+            }),
+            zoom: 16
+          });
+        }, function (err) {
+          console.warn("Kunne ikke hente posisjon", err);
+        }, { enableHighAccuracy: true, timeout: 15000 });
+      }
+      document.getElementById("menu-zoom-btn").addEventListener("click", function () {
+        zoomToMyLocation();
+        closeMenu();
+      });
+
+      // ---------------- Live posisjonssporing (blå prikk) ----------------
+      const locateBtn = document.getElementById("locate-btn");
+      let watchId = null;
+
+      function setLocationDot(lon, lat) {
+        locationGraphicsLayer.removeAll();
+        locationGraphicsLayer.add(new Graphic({
+          geometry: new Point({ longitude: lon, latitude: lat, spatialReference: { wkid: 4326 } }),
+          symbol: {
+            type: "simple-marker",
+            style: "circle",
+            color: [33, 133, 255, 0.9],
+            size: 14,
+            outline: { color: [255, 255, 255, 1], width: 2 }
+          }
+        }));
+      }
+
+      locateBtn.addEventListener("click", function () {
+        if (watchId !== null) {
+          navigator.geolocation.clearWatch(watchId);
+          watchId = null;
+          locationGraphicsLayer.removeAll();
+          locateBtn.classList.remove("active");
+          return;
+        }
+        if (!("geolocation" in navigator)) return;
+        locateBtn.classList.add("active");
+        watchId = navigator.geolocation.watchPosition(function (pos) {
+          setLocationDot(pos.coords.longitude, pos.coords.latitude);
+        }, function (err) {
+          console.warn("Posisjonssporing feilet", err);
+          locateBtn.classList.remove("active");
+          watchId = null;
+        }, { enableHighAccuracy: true, maximumAge: 5000 });
+      });
+    });
+  } else {
+    console.error("ArcGIS Maps SDK ble ikke lastet inn (require er ikke definert) — kartet vises ikke, men resten av appen fungerer.");
+  }
+})();
+</script>
