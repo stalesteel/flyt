@@ -502,18 +502,18 @@
   <form id="report-form">
     <div class="card">
       <span class="field-label">Bilde</span>
-      <input class="photo-input" type="file" id="photo-input" accept="image/*" capture="environment">
+      <input class="photo-input" type="file" id="photo-input" accept="image/*">
       <div class="photo-dropzone" id="photo-dropzone">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"></path>
           <circle cx="12" cy="13" r="4"></circle>
         </svg>
-        <span class="label">Ta bilde</span>
-        <span class="hint">Trykk for å åpne kamera</span>
+        <span class="label">Legg til bilde</span>
+        <span class="hint">Ta bilde eller velg fra bibliotek</span>
       </div>
       <div class="photo-preview-wrap" id="photo-preview-wrap" hidden>
         <img class="photo-preview" id="photo-preview" alt="Forhåndsvisning av bilde">
-        <button type="button" class="photo-retake" id="photo-retake">Ta nytt</button>
+        <button type="button" class="photo-retake" id="photo-retake">Bytt bilde</button>
       </div>
     </div>
 
@@ -558,6 +558,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/exifr@7.1.3/dist/full.umd.js"></script>
 <script src="https://js.arcgis.com/4.34/"></script>
 <script>
 (function () {
@@ -655,7 +656,15 @@
   const doneScreen = document.getElementById("done-screen");
   const againBtn = document.getElementById("again-btn");
 
-  let reportState = { imageBlob: null, position: null, submitting: false };
+  let reportState = { imageBlob: null, position: null, positionSource: null, submitting: false };
+
+  // Grov bounding box for Norge (inkl. Nord-Norge), brukt til å sanity-sjekke
+  // GPS-koordinater hentet fra EXIF-data i valgte bilder.
+  const NORWAY_BOUNDS = { minLat: 57.8, maxLat: 71.5, minLon: 4.0, maxLon: 31.5 };
+  function isWithinNorway(lat, lon) {
+    return lat >= NORWAY_BOUNDS.minLat && lat <= NORWAY_BOUNDS.maxLat &&
+      lon >= NORWAY_BOUNDS.minLon && lon <= NORWAY_BOUNDS.maxLon;
+  }
 
   function openReport() {
     reportOverlay.classList.add("open");
@@ -673,6 +682,7 @@
 
   function requestReportLocation() {
     reportState.position = null;
+    reportState.positionSource = null;
     locationDot.className = "location-dot pending";
     locationText.textContent = "Henter posisjon…";
     locationRetry.hidden = true;
@@ -686,12 +696,16 @@
 
     navigator.geolocation.getCurrentPosition(
       function (pos) {
+        // Ikke overskriv en posisjon som allerede er hentet fra et bildes EXIF-data
+        if (reportState.positionSource === "exif") return;
         reportState.position = { lat: pos.coords.latitude, lon: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        reportState.positionSource = "device";
         locationDot.className = "location-dot ok";
         locationText.innerHTML = "Posisjon funnet <span class=\"coords\">(±" + Math.round(pos.coords.accuracy) + " m)</span>";
         updateSubmitState();
       },
       function (err) {
+        if (reportState.positionSource === "exif") return;
         locationDot.className = "location-dot err";
         locationText.textContent = err.code === err.PERMISSION_DENIED
           ? "Posisjon avslått. Gi tilgang i nettleserinnstillinger."
@@ -710,6 +724,9 @@
   photoInput.addEventListener("change", function () {
     const file = photoInput.files && photoInput.files[0];
     if (!file) return;
+
+    applyPhotoGpsIfValid(file);
+
     compressImage(file, REPORT_CONFIG.maxImageDimension, REPORT_CONFIG.jpegQuality).then(function (blob) {
       reportState.imageBlob = blob;
       photoPreview.src = URL.createObjectURL(blob);
@@ -720,6 +737,25 @@
       showStatus("Klarte ikke å lese bildet. Prøv igjen.", "error");
     });
   });
+
+  // Bruker GPS-data fra bildets EXIF-info (hvis den finnes og faller innenfor
+  // Norge) i stedet for enhetens live posisjon — nyttig for bilder man har
+  // tatt tidligere. exifr er lastet fra CDN; svikter dette, faller appen
+  // stille tilbake til enhetens posisjon.
+  function applyPhotoGpsIfValid(file) {
+    if (typeof exifr === "undefined") return;
+    exifr.gps(file).then(function (gps) {
+      if (!gps || !isWithinNorway(gps.latitude, gps.longitude)) return;
+      reportState.position = { lat: gps.latitude, lon: gps.longitude, accuracy: null };
+      reportState.positionSource = "exif";
+      locationDot.className = "location-dot ok";
+      locationText.textContent = "Posisjon hentet fra bildet";
+      locationRetry.hidden = true;
+      updateSubmitState();
+    }).catch(function () {
+      // Ingen (gyldig) posisjon i bildets EXIF-data — behold enhetens posisjon
+    });
+  }
 
   function compressImage(file, maxDim, quality) {
     return new Promise(function (resolve, reject) {
