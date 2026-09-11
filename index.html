@@ -1392,7 +1392,10 @@
           count: group.features.length,
           onClick: function () {
             closeBrowse();
-            showPhotosForFeatures(group.features, isSeries ? group.label : null, true);
+            showPhotosForFeatures(group.features, {
+              activeSeries: isSeries ? group.label : null,
+              highlightInMap: true
+            });
           }
         }));
       });
@@ -1457,7 +1460,7 @@
   let viewerIndex = 0;
   let viewerCount = 0;
 
-  function openPhotoViewer(slides, activeSeries) {
+  function openPhotoViewer(slides, activeSeries, startIndex) {
     photoViewerTrack.innerHTML = "";
     photoViewerDots.innerHTML = "";
 
@@ -1511,7 +1514,7 @@
 
     photoViewerDots.hidden = slides.length <= 1;
     viewerCount = slides.length;
-    setViewerIndex(0, false);
+    setViewerIndex(startIndex || 0, false);
     photoViewerOverlay.classList.add("open");
   }
 
@@ -1568,15 +1571,17 @@
   photoViewerTrack.addEventListener("pointerup", endDrag);
   photoViewerTrack.addEventListener("pointercancel", endDrag);
 
-  function showPhotosForFeatures(features, activeSeries, highlightInMap) {
+  // options: { activeSeries, highlightInMap, startObjectId }
+  function showPhotosForFeatures(features, options) {
     if (!features || !features.length || !layerRefs.bilder) return;
 
+    const opts = options || {};
     const oidField = layerRefs.bilder.objectIdField || "OBJECTID";
-    const objectIds = features
-      .slice(0, MAX_PHOTOS_PER_SERIES)
+    const objectIds = capAroundTarget(features, oidField, opts.startObjectId)
       .map(function (f) { return f.attributes[oidField]; });
 
-    if (highlightInMap) highlightPhotosInMap(objectIds);
+    const startIndex = Math.max(0, objectIds.indexOf(opts.startObjectId));
+    if (opts.highlightInMap) highlightPhotosInMap(objectIds);
 
     // Attributtene hentes fra serveren, ikke fra grafikkene: både hitTest og
     // layerView-spørringer gir bare feltene laget har lastet ned (outFields),
@@ -1606,14 +1611,61 @@
           series: (attrs[REPORT_CONFIG.seriesField] || "").toString().trim()
         });
       });
-      if (slides.length) openPhotoViewer(slides, activeSeries);
+      if (slides.length) openPhotoViewer(slides, opts.activeSeries, startIndex);
     }).catch(function (err) {
       console.warn("Kunne ikke hente bilder", err);
     });
   }
 
-  // Åpner alle bildene i en serie, uavhengig av hvor spredt de ligger geografisk
-  function showPhotosInSeries(series) {
+  // Klikk på et enkeltbilde i kartet åpner hele serien bildet hører til, med
+  // det klikkede bildet valgt. Hører bildet ikke til en serie, vises det alene.
+  function showSeriesForPhoto(graphic) {
+    if (!layerRefs.bilder) return;
+
+    const oidField = layerRefs.bilder.objectIdField || "OBJECTID";
+    const objectId = graphic.attributes[oidField];
+
+    layerRefs.bilder.queryFeatures({
+      objectIds: [objectId],
+      outFields: ["*"],
+      returnGeometry: false
+    }).then(function (result) {
+      const feature = result.features[0];
+      const series = feature
+        ? (feature.attributes[REPORT_CONFIG.seriesField] || "").toString().trim()
+        : "";
+
+      if (series) showPhotosInSeries(series, objectId);
+      else showPhotosForFeatures([graphic], {});
+    }).catch(function (err) {
+      console.warn("Kunne ikke hente bildet", err);
+    });
+  }
+
+  // Begrenser til MAX_PHOTOS_PER_SERIES, men legger vinduet rundt bildet som
+  // skal vises — ellers ville et klikk på bilde nr. 45 i en serie falt utenfor.
+  function capAroundTarget(features, oidField, targetObjectId) {
+    if (features.length <= MAX_PHOTOS_PER_SERIES) return features;
+
+    let start = 0;
+    if (targetObjectId !== undefined) {
+      let targetIndex = -1;
+      features.forEach(function (f, i) {
+        if (f.attributes[oidField] === targetObjectId) targetIndex = i;
+      });
+      if (targetIndex >= 0) {
+        start = Math.min(
+          Math.max(0, targetIndex - Math.floor(MAX_PHOTOS_PER_SERIES / 2)),
+          features.length - MAX_PHOTOS_PER_SERIES
+        );
+      }
+    }
+    return features.slice(start, start + MAX_PHOTOS_PER_SERIES);
+  }
+
+  // Åpner alle bildene i en serie, uavhengig av hvor spredt de ligger geografisk.
+  // startObjectId angir hvilket bilde som skal vises først.
+  function showPhotosInSeries(series, startObjectId) {
     if (!layerRefs.bilder || !series) return;
 
     // Serienavnet er brukerskrevet tekst, så enkeltfnutter må dobles i SQL-en
@@ -1623,7 +1675,11 @@
       outFields: ["*"],
       returnGeometry: false
     }).then(function (result) {
-      showPhotosForFeatures(result.features, series, true);
+      showPhotosForFeatures(sortByDate(result.features), {
+        activeSeries: series,
+        highlightInMap: true,
+        startObjectId: startObjectId
+      });
     }).catch(function (err) {
       console.warn("Kunne ikke hente bildeserien", err);
     });
@@ -1677,7 +1733,7 @@
               symbol: {
                 type: "simple-marker",
                 style: "circle",
-                color: [47, 111, 79, 1],
+                color: [0, 230, 118, 1],
                 size: 13,
                 outline: { color: [255, 255, 255, 1], width: 2 }
               }
@@ -1731,7 +1787,7 @@
             if (!hit || !hit.graphic) return;
 
             if (!hit.graphic.isAggregate) {
-              showPhotosForFeatures([hit.graphic]);
+              showSeriesForPhoto(hit.graphic);
               return;
             }
             if (!bilderLayerView) return;
