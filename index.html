@@ -531,7 +531,7 @@
   #photo-viewer-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(18,18,21,0.82);
+    background: rgba(14,14,17,0.87);
     z-index: 50;
     opacity: 0;
     pointer-events: none;
@@ -581,11 +581,12 @@
     touch-action: pan-y;
     padding: 14px 20px 0;
     color: #fff;
-    font-size: 1.1rem;
+    font-size: 1.25rem;
     line-height: 1.45;
     text-align: center;
   }
 
+  /* Knapp og ren tekst skal se helt like ut — serienavnet er ikke en lenke */
   .photo-viewer-series {
     flex: 0 0 auto;
     padding: 10px 20px 0;
@@ -594,18 +595,13 @@
   .photo-viewer-series button,
   .photo-viewer-series span {
     font: inherit;
-    font-size: 0.9rem;
-    color: rgba(255,255,255,0.72);
+    font-size: 1.05rem;
+    color: rgba(255,255,255,0.82);
     background: none;
     border: none;
     padding: 4px 2px;
-  }
-  .photo-viewer-series button {
-    color: #9fd3b6;
-    font-weight: 600;
+    text-decoration: none;
     cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 3px;
   }
 
   .photo-viewer-close {
@@ -882,6 +878,14 @@
 
   // Fylles ut når web-kartet er lastet; brukes både av lagbryterne og bildevisningen
   let layerRefs = {};
+
+  // Maks antall bilder som vises om gangen i én serie/dato
+  const MAX_PHOTOS_PER_SERIES = 40;
+
+  // Settes når kartet er klart. Er kartet utilgjengelig, blir markeringen
+  // stille droppet mens resten av appen fortsatt virker.
+  let highlightPhotosInMap = function () {};
+  let clearPhotoHighlight = function () {};
 
   // ---------------------------------------------------------------------
   // Side-meny åpne/lukke (uavhengig av kartet)
@@ -1290,6 +1294,12 @@
   browseOverlay.addEventListener("click", closeBrowse);
   browseBack.addEventListener("click", showBrowseChoices);
 
+  // Markeringen i kartet står til brukeren tar et nytt aktivt valg. Å lukke
+  // eller sveipe i bildevisningen teller ikke — da vil man se den igjen.
+  [menuBtn, infoBtn, browseBtn, cameraBtn].forEach(function (btn) {
+    btn.addEventListener("click", function () { clearPhotoHighlight(); });
+  });
+
   function showBrowseChoices() {
     browseTitle.textContent = "Bla gjennom bilder";
     browseBack.hidden = true;
@@ -1318,7 +1328,9 @@
     if (options.count) {
       const count = document.createElement("span");
       count.className = "count";
-      count.textContent = options.count + (options.count === 1 ? " bilde" : " bilder");
+      count.textContent = options.count > MAX_PHOTOS_PER_SERIES
+        ? MAX_PHOTOS_PER_SERIES + " av " + options.count + " bilder"
+        : options.count + (options.count === 1 ? " bilde" : " bilder");
       row.appendChild(count);
     }
 
@@ -1380,7 +1392,7 @@
           count: group.features.length,
           onClick: function () {
             closeBrowse();
-            showPhotosForFeatures(group.features, isSeries ? group.label : null);
+            showPhotosForFeatures(group.features, isSeries ? group.label : null, true);
           }
         }));
       });
@@ -1556,11 +1568,15 @@
   photoViewerTrack.addEventListener("pointerup", endDrag);
   photoViewerTrack.addEventListener("pointercancel", endDrag);
 
-  function showPhotosForFeatures(features, activeSeries) {
+  function showPhotosForFeatures(features, activeSeries, highlightInMap) {
     if (!features || !features.length || !layerRefs.bilder) return;
 
     const oidField = layerRefs.bilder.objectIdField || "OBJECTID";
-    const objectIds = features.map(function (f) { return f.attributes[oidField]; });
+    const objectIds = features
+      .slice(0, MAX_PHOTOS_PER_SERIES)
+      .map(function (f) { return f.attributes[oidField]; });
+
+    if (highlightInMap) highlightPhotosInMap(objectIds);
 
     // Attributtene hentes fra serveren, ikke fra grafikkene: både hitTest og
     // layerView-spørringer gir bare feltene laget har lastet ned (outFields),
@@ -1607,7 +1623,7 @@
       outFields: ["*"],
       returnGeometry: false
     }).then(function (result) {
-      showPhotosForFeatures(result.features, series);
+      showPhotosForFeatures(result.features, series, true);
     }).catch(function (err) {
       console.warn("Kunne ikke hente bildeserien", err);
     });
@@ -1639,6 +1655,45 @@
 
       const locationGraphicsLayer = new GraphicsLayer({ title: "Min posisjon" });
       view.map.add(locationGraphicsLayer);
+
+      // Eget lag for markerte bilder. featureEffect (dimming) kan ikke brukes
+      // sammen med clustering, så de valgte punktene tegnes på toppen mens
+      // resten av bildelaget dempes med opasitet i stedet.
+      const selectionGraphicsLayer = new GraphicsLayer({ title: "Valgte bilder" });
+      view.map.add(selectionGraphicsLayer);
+
+      highlightPhotosInMap = function (objectIds) {
+        clearPhotoHighlight();
+        if (!layerRefs.bilder || !objectIds.length) return;
+
+        layerRefs.bilder.queryFeatures({
+          objectIds: objectIds,
+          returnGeometry: true
+        }).then(function (result) {
+          result.features.forEach(function (feature) {
+            if (!feature.geometry) return;
+            selectionGraphicsLayer.add(new Graphic({
+              geometry: feature.geometry,
+              symbol: {
+                type: "simple-marker",
+                style: "circle",
+                color: [47, 111, 79, 1],
+                size: 13,
+                outline: { color: [255, 255, 255, 1], width: 2 }
+              }
+            }));
+          });
+          // Resten dempes bare når bildelaget faktisk vises
+          if (layerRefs.bilder.visible) layerRefs.bilder.opacity = 0.25;
+        }).catch(function (err) {
+          console.warn("Kunne ikke markere bildene i kartet", err);
+        });
+      };
+
+      clearPhotoHighlight = function () {
+        selectionGraphicsLayer.removeAll();
+        if (layerRefs.bilder) layerRefs.bilder.opacity = 1;
+      };
 
       // Flytt kartets innebygde zoom-knapper vekk fra øverste venstre hjørne,
       // slik at de ikke kolliderer med hamburgermeny-knappen (#menu-btn).
@@ -1696,15 +1751,19 @@
       });
 
       document.getElementById("toggle-led").addEventListener("change", function (e) {
+        clearPhotoHighlight();
         if (layerRefs.led) layerRefs.led.visible = e.target.checked;
       });
       document.getElementById("toggle-bilder").addEventListener("change", function (e) {
+        clearPhotoHighlight();
         if (layerRefs.bilder) layerRefs.bilder.visible = e.target.checked;
       });
       document.getElementById("toggle-papirkart").addEventListener("change", function (e) {
+        clearPhotoHighlight();
         if (layerRefs.papirkart) layerRefs.papirkart.visible = e.target.checked;
       });
       document.getElementById("toggle-nve").addEventListener("change", function (e) {
+        clearPhotoHighlight();
         if (layerRefs.nve) layerRefs.nve.visible = e.target.checked;
       });
 
@@ -1733,6 +1792,7 @@
       }
 
       basemapList.addEventListener("change", function (e) {
+        clearPhotoHighlight();
         const bm = BASEMAPS[parseInt(e.target.value, 10)];
         if (!bm) return;
         const newBasemap = buildBasemap(bm);
@@ -1756,6 +1816,7 @@
         }, { enableHighAccuracy: true, timeout: 15000 });
       }
       document.getElementById("menu-zoom-btn").addEventListener("click", function () {
+        clearPhotoHighlight();
         zoomToMyLocation();
         closeMenu();
       });
@@ -1779,6 +1840,7 @@
       }
 
       locateBtn.addEventListener("click", function () {
+        clearPhotoHighlight();
         if (watchId !== null) {
           navigator.geolocation.clearWatch(watchId);
           watchId = null;
