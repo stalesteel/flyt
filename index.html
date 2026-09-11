@@ -417,7 +417,7 @@
   #photo-viewer-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(10,10,12,0.92);
+    background: rgba(18,18,21,0.82);
     z-index: 50;
     opacity: 0;
     pointer-events: none;
@@ -1086,15 +1086,29 @@
     const oidField = layerRefs.bilder.objectIdField || "OBJECTID";
     const objectIds = features.map(function (f) { return f.attributes[oidField]; });
 
-    layerRefs.bilder.queryAttachments({ objectIds: objectIds }).then(function (attachmentsByOid) {
+    // Kommentarene hentes fra serveren, ikke fra grafikkene: både hitTest og
+    // layerView-spørringer gir bare feltene laget har lastet ned (outFields),
+    // og kommentarfeltet er ikke nødvendigvis blant dem.
+    Promise.all([
+      layerRefs.bilder.queryAttachments({ objectIds: objectIds }),
+      layerRefs.bilder.queryFeatures({
+        objectIds: objectIds,
+        outFields: ["*"],
+        returnGeometry: false
+      })
+    ]).then(function (results) {
+      const attachmentsByOid = results[0];
+      const commentByOid = {};
+      results[1].features.forEach(function (f) {
+        commentByOid[f.attributes[oidField]] =
+          (f.attributes[REPORT_CONFIG.commentField] || "").toString().trim();
+      });
+
       const slides = [];
-      features.forEach(function (f) {
-        const attachments = attachmentsByOid[f.attributes[oidField]];
+      objectIds.forEach(function (oid) {
+        const attachments = attachmentsByOid[oid];
         if (!attachments || !attachments.length) return;
-        slides.push({
-          url: attachments[0].url,
-          comment: (f.attributes[REPORT_CONFIG.commentField] || "").toString().trim()
-        });
+        slides.push({ url: attachments[0].url, comment: commentByOid[oid] || "" });
       });
       if (slides.length) openPhotoViewer(slides);
     }).catch(function (err) {
@@ -1172,7 +1186,6 @@
 
             const query = bilderLayerView.createQuery();
             query.aggregateIds = [hit.graphic.getObjectId()];
-            query.outFields = ["*"];
             query.returnGeometry = false;
             bilderLayerView.queryFeatures(query).then(function (result) {
               showPhotosForFeatures(result.features);
