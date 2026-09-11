@@ -59,6 +59,8 @@
 
   #info-btn { left: 16px; bottom: 24px; }
 
+  #browse-btn { left: 88px; bottom: 24px; }
+
   #menu-btn { right: 16px; bottom: 24px; }
 
   #locate-btn { right: 88px; bottom: 24px; }
@@ -260,6 +262,76 @@
     padding: 10px 18px 26px;
   }
   #info-sheet.open { transform: translateY(0); }
+
+  #browse-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 39;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  #browse-overlay.open { opacity: 1; pointer-events: auto; }
+
+  #browse-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 80vh;
+    background: var(--surface);
+    z-index: 40;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.2);
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    padding: 10px 18px calc(26px + env(safe-area-inset-bottom, 0px));
+  }
+  #browse-sheet.open { transform: translateY(0); }
+
+  .browse-back {
+    background: none;
+    border: none;
+    font-size: 1.6rem;
+    line-height: 1;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0 8px 0 0;
+    margin-right: 2px;
+  }
+  .sheet-header h2 { flex: 1; }
+
+  .browse-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 2px;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    background: none;
+    font-family: inherit;
+    font-size: 0.95rem;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+  }
+  .browse-row:last-child { border-bottom: none; }
+  .browse-row:active { background: var(--bg); }
+  .browse-row svg { width: 19px; height: 19px; flex-shrink: 0; color: var(--text-muted); }
+  .browse-row .label { flex: 1; min-width: 0; font-weight: 600; }
+  .browse-row .count {
+    flex-shrink: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .browse-row .chevron { flex-shrink: 0; color: var(--text-muted); font-size: 1.2rem; line-height: 1; }
+
+  .browse-empty { padding: 24px 2px; color: var(--text-muted); font-size: 0.92rem; text-align: center; }
 
   #info-sheet .card p { margin: 0 0 12px; font-size: 0.92rem; line-height: 1.5; }
   #info-sheet .card p:last-child { margin-bottom: 0; }
@@ -587,6 +659,15 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
 </button>
 
+<button class="fab" id="browse-btn" aria-label="Bla gjennom bilder">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="8" y="3" width="13" height="13" rx="2"></rect>
+    <circle cx="12" cy="7.5" r="1.3"></circle>
+    <path d="M21 12.5l-3.5-3.5L11 15.5"></path>
+    <path d="M16 20.5H5a1.5 1.5 0 0 1-1.5-1.5V7.5"></path>
+  </svg>
+</button>
+
 <button class="fab" id="camera-btn" aria-label="Rapporter observasjon">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"></path>
@@ -729,6 +810,18 @@
     <p><strong>Viktig:</strong> Flyt er ikke ment for navigasjon. Bruk godkjent utstyr og offisielle sjøkart når du ferdes på vannet.</p>
     <p>Har du innspill, eller oppdager du noe som ikke stemmer? Send gjerne en e-post til <a href="mailto:stale@klommestein.no">stale@klommestein.no</a>.</p>
   </div>
+</div>
+
+<!-- Bla gjennom bilder (serier / datoer) -->
+<div id="browse-overlay"></div>
+<div id="browse-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <button type="button" class="browse-back" id="browse-back" aria-label="Tilbake" hidden>‹</button>
+    <h2 id="browse-title">Bla gjennom bilder</h2>
+    <button type="button" class="close-btn" id="browse-close">✕</button>
+  </div>
+  <div id="browse-body"></div>
 </div>
 
 <!-- Bildevisning (mørk fullskjerm, med sveip mellom bilder i et cluster) -->
@@ -1167,6 +1260,178 @@
     if (attachJson.error || !(attachJson.addAttachmentResult && attachJson.addAttachmentResult.success)) {
       throw new Error("addAttachment feilet: " + JSON.stringify(attachJson));
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // Bla gjennom bilder — velg en bildeserie eller en dato, og sveip gjennom
+  // ---------------------------------------------------------------------
+  const browseBtn = document.getElementById("browse-btn");
+  const browseOverlay = document.getElementById("browse-overlay");
+  const browseSheet = document.getElementById("browse-sheet");
+  const browseClose = document.getElementById("browse-close");
+  const browseBack = document.getElementById("browse-back");
+  const browseTitle = document.getElementById("browse-title");
+  const browseBody = document.getElementById("browse-body");
+
+  const CHEVRON = "›";
+
+  function openBrowse() {
+    browseOverlay.classList.add("open");
+    browseSheet.classList.add("open");
+    showBrowseChoices();
+  }
+  function closeBrowse() {
+    browseOverlay.classList.remove("open");
+    browseSheet.classList.remove("open");
+  }
+
+  browseBtn.addEventListener("click", openBrowse);
+  browseClose.addEventListener("click", closeBrowse);
+  browseOverlay.addEventListener("click", closeBrowse);
+  browseBack.addEventListener("click", showBrowseChoices);
+
+  function showBrowseChoices() {
+    browseTitle.textContent = "Bla gjennom bilder";
+    browseBack.hidden = true;
+    browseBody.innerHTML = "";
+
+    browseBody.appendChild(buildBrowseRow({
+      label: "Velg bildeserie",
+      onClick: function () { showBrowseList("series"); }
+    }));
+    browseBody.appendChild(buildBrowseRow({
+      label: "Velg dato",
+      onClick: function () { showBrowseList("dates"); }
+    }));
+  }
+
+  function buildBrowseRow(options) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "browse-row";
+
+    const label = document.createElement("span");
+    label.className = "label";
+    label.textContent = options.label;
+    row.appendChild(label);
+
+    if (options.count) {
+      const count = document.createElement("span");
+      count.className = "count";
+      count.textContent = options.count + (options.count === 1 ? " bilde" : " bilder");
+      row.appendChild(count);
+    }
+
+    const chevron = document.createElement("span");
+    chevron.className = "chevron";
+    chevron.textContent = CHEVRON;
+    row.appendChild(chevron);
+
+    row.addEventListener("click", options.onClick);
+    return row;
+  }
+
+  function setBrowseMessage(text) {
+    browseBody.innerHTML = "";
+    const msg = document.createElement("div");
+    msg.className = "browse-empty";
+    msg.textContent = text;
+    browseBody.appendChild(msg);
+  }
+
+  // Henter et lett register over alle bildene (uten geometri og vedlegg) som
+  // begge listene utledes fra — datoene må uansett grupperes på klientsiden,
+  // siden feltet er et tidspunkt og ikke en kalenderdag.
+  function loadBrowseIndex() {
+    return layerRefs.bilder.queryFeatures({
+      where: "1=1",
+      outFields: ["*"],
+      returnGeometry: false
+    }).then(function (result) {
+      return result.features;
+    });
+  }
+
+  function showBrowseList(kind) {
+    const isSeries = kind === "series";
+    browseTitle.textContent = isSeries ? "Bildeserier" : "Datoer";
+    browseBack.hidden = false;
+    setBrowseMessage("Henter…");
+
+    if (!layerRefs.bilder) {
+      setBrowseMessage("Kartet er ikke lastet ennå. Prøv igjen om litt.");
+      return;
+    }
+
+    loadBrowseIndex().then(function (features) {
+      const groups = isSeries ? groupBySeries(features) : groupByDate(features);
+
+      if (!groups.length) {
+        setBrowseMessage(isSeries
+          ? "Ingen bildeserier ennå. Serier lages når du laster opp flere bilder samtidig."
+          : "Ingen bilder med dato ennå.");
+        return;
+      }
+
+      browseBody.innerHTML = "";
+      groups.forEach(function (group) {
+        browseBody.appendChild(buildBrowseRow({
+          label: group.label,
+          count: group.features.length,
+          onClick: function () {
+            closeBrowse();
+            showPhotosForFeatures(group.features, isSeries ? group.label : null);
+          }
+        }));
+      });
+    }).catch(function (err) {
+      console.warn("Kunne ikke hente oversikten", err);
+      setBrowseMessage("Klarte ikke å hente oversikten. Prøv igjen.");
+    });
+  }
+
+  function groupBySeries(features) {
+    const bySeries = {};
+    features.forEach(function (f) {
+      const series = (f.attributes[REPORT_CONFIG.seriesField] || "").toString().trim();
+      if (!series) return;
+      (bySeries[series] = bySeries[series] || []).push(f);
+    });
+
+    return Object.keys(bySeries).sort().map(function (series) {
+      return { label: series, features: sortByDate(bySeries[series]) };
+    });
+  }
+
+  function groupByDate(features) {
+    const byDay = {};
+    features.forEach(function (f) {
+      const value = f.attributes[REPORT_CONFIG.dateField];
+      if (!value) return;
+      const date = new Date(value);
+      const key = date.getFullYear() + "-" +
+        String(date.getMonth() + 1).padStart(2, "0") + "-" +
+        String(date.getDate()).padStart(2, "0");
+      (byDay[key] = byDay[key] || { date: date, features: [] }).features.push(f);
+    });
+
+    // Nyeste dag først
+    return Object.keys(byDay).sort().reverse().map(function (key) {
+      return {
+        label: formatDay(byDay[key].date),
+        features: sortByDate(byDay[key].features)
+      };
+    });
+  }
+
+  function sortByDate(features) {
+    return features.slice().sort(function (a, b) {
+      return (a.attributes[REPORT_CONFIG.dateField] || 0) - (b.attributes[REPORT_CONFIG.dateField] || 0);
+    });
+  }
+
+  function formatDay(date) {
+    return date.toLocaleDateString("nb-NO", { day: "numeric", month: "long", year: "numeric" });
   }
 
   // ---------------------------------------------------------------------
