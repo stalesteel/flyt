@@ -1710,13 +1710,11 @@
       });
 
       const locationGraphicsLayer = new GraphicsLayer({ title: "Min posisjon" });
-      view.map.add(locationGraphicsLayer);
 
       // Eget lag for markerte bilder. featureEffect (dimming) kan ikke brukes
       // sammen med clustering, så de valgte punktene tegnes på toppen mens
       // resten av bildelaget dempes med opasitet i stedet.
       const selectionGraphicsLayer = new GraphicsLayer({ title: "Valgte bilder" });
-      view.map.add(selectionGraphicsLayer);
 
       highlightPhotosInMap = function (objectIds) {
         clearPhotoHighlight();
@@ -1759,6 +1757,11 @@
       view.popupEnabled = false;
 
       view.when(function () {
+        // Legges til først her, ikke ved oppstart: webkartets egne lag lastes
+        // asynkront og ville ellers havnet oppå grafikklagene
+        view.map.add(selectionGraphicsLayer);
+        view.map.add(locationGraphicsLayer);
+
         webmap.layers.forEach(function (layer) {
           Object.keys(LAYER_TITLES).forEach(function (key) {
             if (layer.title === LAYER_TITLES[key]) {
