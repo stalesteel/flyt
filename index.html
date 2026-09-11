@@ -782,6 +782,7 @@
     featureLayerUrl: "https://services.arcgis.com/2JyTvMWQSnM2Vi8q/arcgis/rest/services/BilderInnsjo/FeatureServer/0",
     commentField: "Kommentar",
     seriesField: "Serie",
+    dateField: "Dato",
     maxImageDimension: 1600,
     jpegQuality: 0.75
   };
@@ -924,10 +925,10 @@
     showStatus("", "");
     Promise.all(files.map(function (file) {
       return Promise.all([
-        readPhotoGps(file),
+        readPhotoMeta(file),
         compressImage(file, REPORT_CONFIG.maxImageDimension, REPORT_CONFIG.jpegQuality)
       ]).then(function (parts) {
-        return { position: parts[0], blob: parts[1] };
+        return { position: parts[0].position, date: parts[0].date, blob: parts[1] };
       });
     })).then(function (photos) {
       reportState.photos = photos;
@@ -938,16 +939,25 @@
     });
   });
 
-  // Leser GPS-data fra bildets EXIF-info. Gir null hvis posisjonen mangler,
-  // er ugyldig, eller faller utenfor Norge. exifr lastes fra CDN; svikter det,
-  // oppfører alle bilder seg som om de mangler posisjon.
-  function readPhotoGps(file) {
-    if (typeof exifr === "undefined") return Promise.resolve(null);
-    return exifr.gps(file).then(function (gps) {
-      if (!gps || !isWithinNorway(gps.latitude, gps.longitude)) return null;
-      return { lat: gps.latitude, lon: gps.longitude, accuracy: null };
+  // Leser posisjon og opptakstidspunkt fra bildets EXIF-info. Posisjonen blir
+  // null hvis den mangler, er ugyldig eller faller utenfor Norge. exifr lastes
+  // fra CDN; svikter det, oppfører alle bilder seg som om de mangler EXIF-data.
+  function readPhotoMeta(file) {
+    const empty = { position: null, date: null };
+    if (typeof exifr === "undefined") return Promise.resolve(empty);
+
+    return exifr.parse(file).then(function (exif) {
+      if (!exif) return empty;
+
+      const position = isWithinNorway(exif.latitude, exif.longitude)
+        ? { lat: exif.latitude, lon: exif.longitude, accuracy: null }
+        : null;
+
+      // DateTimeOriginal er selve opptakstidspunktet; de andre er reserver
+      const date = exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate || null;
+      return { position: position, date: date instanceof Date ? date : null };
     }).catch(function () {
-      return null;
+      return empty;
     });
   }
 
@@ -1034,8 +1044,12 @@
   function submittablePhotos() {
     const photos = reportState.photos;
     if (photos.length === 1) {
-      const position = photos[0].position || reportState.position;
-      return position ? [{ blob: photos[0].blob, position: position }] : [];
+      const photo = photos[0];
+      const position = photo.position || reportState.position;
+      if (!position) return [];
+      // Uten EXIF-posisjon er bildet tatt her og nå, så opptakstidspunktet er nå
+      const date = photo.date || (photo.position ? null : new Date());
+      return [{ blob: photo.blob, position: position, date: date }];
     }
     return photos.filter(function (p) { return p.position; });
   }
@@ -1098,15 +1112,19 @@
     requestReportLocation();
   });
 
-  async function submitReport(photos, attrs) {
+  async function submitReport(photos, sharedAttrs) {
     const features = photos.map(function (photo) {
+      const attributes = Object.assign({}, sharedAttrs);
+      // Datofelt i ArcGIS lagres som epoch-millisekunder
+      if (photo.date) attributes[REPORT_CONFIG.dateField] = photo.date.getTime();
+
       return {
         geometry: {
           x: photo.position.lon,
           y: photo.position.lat,
           spatialReference: { wkid: 4326 }
         },
-        attributes: attrs
+        attributes: attributes
       };
     });
 
