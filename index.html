@@ -346,6 +346,48 @@
     cursor: pointer;
   }
 
+  .photo-strip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .photo-strip img {
+    width: 72px;
+    height: 72px;
+    flex: 0 0 auto;
+    object-fit: cover;
+    border-radius: 10px;
+    display: block;
+  }
+  .photo-strip img.no-gps { opacity: 0.4; }
+
+  .photo-change-btn {
+    margin-top: 12px;
+    width: 100%;
+    padding: 10px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .series-input {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--text);
+  }
+  .series-input:focus { outline: none; border-color: var(--accent); }
+
   .location-row { display: flex; align-items: center; gap: 10px; font-size: 0.88rem; }
   .location-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
   .location-dot.ok { background: var(--accent); }
@@ -470,6 +512,28 @@
     font-size: 1.1rem;
     line-height: 1.45;
     text-align: center;
+  }
+
+  .photo-viewer-series {
+    flex: 0 0 auto;
+    padding: 10px 20px 0;
+    text-align: center;
+  }
+  .photo-viewer-series button,
+  .photo-viewer-series span {
+    font: inherit;
+    font-size: 0.9rem;
+    color: rgba(255,255,255,0.72);
+    background: none;
+    border: none;
+    padding: 4px 2px;
+  }
+  .photo-viewer-series button {
+    color: #9fd3b6;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 
   .photo-viewer-close {
@@ -602,33 +666,42 @@
   <form id="report-form">
     <div class="card">
       <span class="field-label">Bilde</span>
-      <input class="photo-input" type="file" id="photo-input" accept="image/*">
+      <input class="photo-input" type="file" id="photo-input" accept="image/*" multiple>
       <div class="photo-dropzone" id="photo-dropzone">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"></path>
           <circle cx="12" cy="13" r="4"></circle>
         </svg>
-        <span class="label">Legg til bilde</span>
-        <span class="hint">Ta bilde eller velg fra bibliotek</span>
+        <span class="label">Legg til bilder</span>
+        <span class="hint">Ta bilde eller velg ett eller flere fra bibliotek</span>
       </div>
       <div class="photo-preview-wrap" id="photo-preview-wrap" hidden>
         <img class="photo-preview" id="photo-preview" alt="Forhåndsvisning av bilde">
         <button type="button" class="photo-retake" id="photo-retake">Bytt bilde</button>
       </div>
+      <div class="photo-strip" id="photo-strip" hidden></div>
+      <button type="button" class="photo-change-btn" id="photo-change" hidden>Bytt utvalg</button>
     </div>
 
     <div class="card">
       <span class="field-label">Posisjon</span>
-      <div class="location-row">
+      <div class="location-row" id="location-row">
         <span class="location-dot pending" id="location-dot"></span>
         <span class="location-text" id="location-text">Henter posisjon…</span>
         <button type="button" class="retry-link" id="location-retry" hidden>Prøv igjen</button>
       </div>
+      <p class="menu-hint" id="batch-location-hint" hidden></p>
     </div>
 
-    <div class="card">
+    <div class="card" id="comment-card">
       <span class="field-label">Kommentar (valgfritt)</span>
-      <textarea id="comment-input" placeholder="Skriv en kort kommentar…" maxlength="1000"></textarea>
+      <textarea id="comment-input" placeholder="Skriv en kort kommentar…" maxlength="255"></textarea>
+    </div>
+
+    <div class="card" id="series-card" hidden>
+      <span class="field-label">Navn på serien (valgfritt)</span>
+      <input type="text" class="series-input" id="series-input" maxlength="120" placeholder="F.eks. Kveldstur med reker 19. august 2025">
+      <p class="menu-hint">Bildene knyttes sammen under dette navnet, slik at du kan bla gjennom hele turen senere.</p>
     </div>
 
     <button type="submit" class="submit-btn" id="submit-btn" disabled>Send inn</button>
@@ -638,7 +711,7 @@
   <div class="done-screen" id="done-screen" hidden>
     <div class="check">✓</div>
     <h2>Takk for rapporten!</h2>
-    <p>Bildet og kommentaren din er sendt inn.</p>
+    <p id="done-text">Bildet og kommentaren din er sendt inn.</p>
     <button type="button" class="again-btn" id="again-btn">Send inn en ny</button>
   </div>
 </div>
@@ -708,6 +781,7 @@
   const REPORT_CONFIG = {
     featureLayerUrl: "https://services.arcgis.com/2JyTvMWQSnM2Vi8q/arcgis/rest/services/BilderInnsjo/FeatureServer/0",
     commentField: "Kommentar",
+    seriesField: "Serie",
     maxImageDimension: 1600,
     jpegQuality: 0.75
   };
@@ -757,16 +831,27 @@
   const photoPreviewWrap = document.getElementById("photo-preview-wrap");
   const photoPreview = document.getElementById("photo-preview");
   const photoRetake = document.getElementById("photo-retake");
+  const photoStrip = document.getElementById("photo-strip");
+  const photoChange = document.getElementById("photo-change");
+  const locationRow = document.getElementById("location-row");
   const locationDot = document.getElementById("location-dot");
   const locationText = document.getElementById("location-text");
   const locationRetry = document.getElementById("location-retry");
+  const batchLocationHint = document.getElementById("batch-location-hint");
+  const commentCard = document.getElementById("comment-card");
   const commentInput = document.getElementById("comment-input");
+  const seriesCard = document.getElementById("series-card");
+  const seriesInput = document.getElementById("series-input");
   const submitBtn = document.getElementById("submit-btn");
   const statusMsg = document.getElementById("status-msg");
   const doneScreen = document.getElementById("done-screen");
+  const doneText = document.getElementById("done-text");
   const againBtn = document.getElementById("again-btn");
 
-  let reportState = { imageBlob: null, position: null, positionSource: null, submitting: false };
+  // photos: [{ blob, position }] — position er hentet fra bildets EXIF-data, og
+  // er null for bilder uten (gyldig) posisjon. position/positionSource gjelder
+  // kun enkeltbilde-flyten, der enhetens posisjon brukes som reserve.
+  let reportState = { photos: [], position: null, positionSource: null, submitting: false };
 
   // Grov bounding box for Norge (inkl. Nord-Norge), brukt til å sanity-sjekke
   // GPS-koordinater hentet fra EXIF-data i valgte bilder.
@@ -830,41 +915,91 @@
 
   photoDropzone.addEventListener("click", function () { photoInput.click(); });
   photoRetake.addEventListener("click", function () { photoInput.click(); });
+  photoChange.addEventListener("click", function () { photoInput.click(); });
 
   photoInput.addEventListener("change", function () {
-    const file = photoInput.files && photoInput.files[0];
-    if (!file) return;
+    const files = Array.prototype.slice.call(photoInput.files || []);
+    if (!files.length) return;
 
-    applyPhotoGpsIfValid(file);
-
-    compressImage(file, REPORT_CONFIG.maxImageDimension, REPORT_CONFIG.jpegQuality).then(function (blob) {
-      reportState.imageBlob = blob;
-      photoPreview.src = URL.createObjectURL(blob);
-      photoPreviewWrap.hidden = false;
-      photoDropzone.hidden = true;
+    showStatus("", "");
+    Promise.all(files.map(function (file) {
+      return Promise.all([
+        readPhotoGps(file),
+        compressImage(file, REPORT_CONFIG.maxImageDimension, REPORT_CONFIG.jpegQuality)
+      ]).then(function (parts) {
+        return { position: parts[0], blob: parts[1] };
+      });
+    })).then(function (photos) {
+      reportState.photos = photos;
+      renderPhotoSelection();
       updateSubmitState();
     }).catch(function () {
-      showStatus("Klarte ikke å lese bildet. Prøv igjen.", "error");
+      showStatus("Klarte ikke å lese bildene. Prøv igjen.", "error");
     });
   });
 
-  // Bruker GPS-data fra bildets EXIF-info (hvis den finnes og faller innenfor
-  // Norge) i stedet for enhetens live posisjon — nyttig for bilder man har
-  // tatt tidligere. exifr er lastet fra CDN; svikter dette, faller appen
-  // stille tilbake til enhetens posisjon.
-  function applyPhotoGpsIfValid(file) {
-    if (typeof exifr === "undefined") return;
-    exifr.gps(file).then(function (gps) {
-      if (!gps || !isWithinNorway(gps.latitude, gps.longitude)) return;
-      reportState.position = { lat: gps.latitude, lon: gps.longitude, accuracy: null };
-      reportState.positionSource = "exif";
-      locationDot.className = "location-dot ok";
-      locationText.textContent = "Posisjon hentet fra bildet";
-      locationRetry.hidden = true;
-      updateSubmitState();
+  // Leser GPS-data fra bildets EXIF-info. Gir null hvis posisjonen mangler,
+  // er ugyldig, eller faller utenfor Norge. exifr lastes fra CDN; svikter det,
+  // oppfører alle bilder seg som om de mangler posisjon.
+  function readPhotoGps(file) {
+    if (typeof exifr === "undefined") return Promise.resolve(null);
+    return exifr.gps(file).then(function (gps) {
+      if (!gps || !isWithinNorway(gps.latitude, gps.longitude)) return null;
+      return { lat: gps.latitude, lon: gps.longitude, accuracy: null };
     }).catch(function () {
-      // Ingen (gyldig) posisjon i bildets EXIF-data — behold enhetens posisjon
+      return null;
     });
+  }
+
+  function renderPhotoSelection() {
+    const photos = reportState.photos;
+    const isBatch = photos.length > 1;
+
+    photoDropzone.hidden = photos.length > 0;
+    photoPreviewWrap.hidden = photos.length !== 1;
+    photoStrip.hidden = !isBatch;
+    photoChange.hidden = !isBatch;
+    commentCard.hidden = isBatch;
+    seriesCard.hidden = !isBatch;
+    locationRow.hidden = isBatch;
+    batchLocationHint.hidden = !isBatch;
+
+    if (photos.length === 1) {
+      photoPreview.src = URL.createObjectURL(photos[0].blob);
+      applySinglePhotoPosition(photos[0].position);
+      return;
+    }
+    if (!photos.length) return;
+
+    photoStrip.innerHTML = "";
+    photos.forEach(function (photo) {
+      const img = document.createElement("img");
+      img.src = URL.createObjectURL(photo.blob);
+      img.alt = "";
+      if (!photo.position) img.className = "no-gps";
+      photoStrip.appendChild(img);
+    });
+
+    const withGps = photos.filter(function (p) { return p.position; }).length;
+    const skipped = photos.length - withGps;
+    batchLocationHint.textContent = skipped === 0
+      ? "Alle " + photos.length + " bildene har posisjon og plasseres der de ble tatt."
+      : withGps + " av " + photos.length + " bilder har posisjon. " + skipped +
+        (skipped === 1 ? " bilde mangler posisjon og sendes ikke inn." : " bilder mangler posisjon og sendes ikke inn.");
+  }
+
+  // Enkeltbilde: posisjon fra EXIF hvis den finnes, ellers enhetens egen posisjon
+  function applySinglePhotoPosition(position) {
+    if (!position) {
+      // Byttet til et bilde uten posisjon: forrige bildes posisjon gjelder ikke lenger
+      if (reportState.positionSource === "exif") requestReportLocation();
+      return;
+    }
+    reportState.position = position;
+    reportState.positionSource = "exif";
+    locationDot.className = "location-dot ok";
+    locationText.textContent = "Posisjon hentet fra bildet";
+    locationRetry.hidden = true;
   }
 
   function compressImage(file, maxDim, quality) {
@@ -894,8 +1029,19 @@
     });
   }
 
+  // Bildene som faktisk kan sendes inn: ved enkeltbilde brukes enhetens
+  // posisjon som reserve, ved flere bilder kreves posisjon fra bildet selv.
+  function submittablePhotos() {
+    const photos = reportState.photos;
+    if (photos.length === 1) {
+      const position = photos[0].position || reportState.position;
+      return position ? [{ blob: photos[0].blob, position: position }] : [];
+    }
+    return photos.filter(function (p) { return p.position; });
+  }
+
   function updateSubmitState() {
-    submitBtn.disabled = !(reportState.imageBlob && reportState.position) || reportState.submitting;
+    submitBtn.disabled = submittablePhotos().length === 0 || reportState.submitting;
   }
   function showStatus(text, kind) {
     statusMsg.textContent = text;
@@ -904,19 +1050,32 @@
 
   form.addEventListener("submit", function (e) {
     e.preventDefault();
-    if (!reportState.imageBlob || !reportState.position || reportState.submitting) return;
+    const photos = submittablePhotos();
+    if (!photos.length || reportState.submitting) return;
 
     reportState.submitting = true;
     updateSubmitState();
     submitBtn.innerHTML = "<span class=\"spinner\"></span>Sender inn…";
     showStatus("", "");
 
-    submitReport()
+    const isBatch = reportState.photos.length > 1;
+    const attrs = {};
+    if (isBatch) {
+      const series = seriesInput.value.trim();
+      if (series) attrs[REPORT_CONFIG.seriesField] = series;
+    } else {
+      const comment = commentInput.value.trim();
+      if (comment) attrs[REPORT_CONFIG.commentField] = comment;
+    }
+
+    submitReport(photos, attrs)
       .then(function () {
+        doneText.textContent = photos.length === 1
+          ? "Bildet ditt er sendt inn."
+          : photos.length + " bilder er sendt inn.";
         form.reset();
-        photoPreviewWrap.hidden = true;
-        photoDropzone.hidden = false;
-        reportState.imageBlob = null;
+        reportState.photos = [];
+        renderPhotoSelection();
         form.hidden = true;
         doneScreen.hidden = false;
       })
@@ -935,26 +1094,25 @@
     doneScreen.hidden = true;
     form.hidden = false;
     commentInput.value = "";
+    seriesInput.value = "";
     requestReportLocation();
   });
 
-  async function submitReport() {
-    const attrs = {};
-    const comment = commentInput.value.trim();
-    if (comment) attrs[REPORT_CONFIG.commentField] = comment;
-
-    const feature = {
-      geometry: {
-        x: reportState.position.lon,
-        y: reportState.position.lat,
-        spatialReference: { wkid: 4326 }
-      },
-      attributes: attrs
-    };
+  async function submitReport(photos, attrs) {
+    const features = photos.map(function (photo) {
+      return {
+        geometry: {
+          x: photo.position.lon,
+          y: photo.position.lat,
+          spatialReference: { wkid: 4326 }
+        },
+        attributes: attrs
+      };
+    });
 
     const addBody = new URLSearchParams();
     addBody.set("f", "json");
-    addBody.set("features", JSON.stringify([feature]));
+    addBody.set("features", JSON.stringify(features));
 
     const addResp = await fetch(REPORT_CONFIG.featureLayerUrl + "/addFeatures", {
       method: "POST",
@@ -963,13 +1121,25 @@
     });
     const addJson = await addResp.json();
     if (addJson.error) throw new Error("addFeatures: " + (addJson.error.message || JSON.stringify(addJson.error)));
-    const result = addJson.addResults && addJson.addResults[0];
-    if (!result || !result.success) throw new Error("addFeatures: innsending feilet (" + JSON.stringify(result) + ")");
 
-    const objectId = result.objectId;
+    const results = addJson.addResults || [];
+    if (results.length !== photos.length) {
+      throw new Error("addFeatures: uventet antall svar (" + JSON.stringify(results) + ")");
+    }
+
+    // addResults kommer i samme rekkefølge som features ble sendt inn
+    for (let i = 0; i < results.length; i++) {
+      if (!results[i] || !results[i].success) {
+        throw new Error("addFeatures: innsending feilet (" + JSON.stringify(results[i]) + ")");
+      }
+      await addAttachment(results[i].objectId, photos[i].blob);
+    }
+  }
+
+  async function addAttachment(objectId, blob) {
     const attachForm = new FormData();
     attachForm.set("f", "json");
-    attachForm.set("attachment", reportState.imageBlob, "observasjon.jpg");
+    attachForm.set("attachment", blob, "observasjon.jpg");
 
     const attachResp = await fetch(REPORT_CONFIG.featureLayerUrl + "/" + objectId + "/addAttachment", {
       method: "POST",
@@ -992,7 +1162,7 @@
   let viewerIndex = 0;
   let viewerCount = 0;
 
-  function openPhotoViewer(slides) {
+  function openPhotoViewer(slides, activeSeries) {
     photoViewerTrack.innerHTML = "";
     photoViewerDots.innerHTML = "";
 
@@ -1015,6 +1185,25 @@
         caption.className = "photo-viewer-caption";
         caption.textContent = slide.comment;
         slideEl.appendChild(caption);
+      }
+
+      if (slide.series) {
+        const seriesEl = document.createElement("div");
+        seriesEl.className = "photo-viewer-series";
+
+        // Vises som ren tekst når man allerede blar gjennom denne serien
+        if (slide.series === activeSeries) {
+          const label = document.createElement("span");
+          label.textContent = slide.series;
+          seriesEl.appendChild(label);
+        } else {
+          const link = document.createElement("button");
+          link.type = "button";
+          link.textContent = slide.series;
+          link.addEventListener("click", function () { showPhotosInSeries(slide.series); });
+          seriesEl.appendChild(link);
+        }
+        slideEl.appendChild(seriesEl);
       }
       photoViewerTrack.appendChild(slideEl);
 
@@ -1084,13 +1273,13 @@
   photoViewerTrack.addEventListener("pointerup", endDrag);
   photoViewerTrack.addEventListener("pointercancel", endDrag);
 
-  function showPhotosForFeatures(features) {
+  function showPhotosForFeatures(features, activeSeries) {
     if (!features || !features.length || !layerRefs.bilder) return;
 
     const oidField = layerRefs.bilder.objectIdField || "OBJECTID";
     const objectIds = features.map(function (f) { return f.attributes[oidField]; });
 
-    // Kommentarene hentes fra serveren, ikke fra grafikkene: både hitTest og
+    // Attributtene hentes fra serveren, ikke fra grafikkene: både hitTest og
     // layerView-spørringer gir bare feltene laget har lastet ned (outFields),
     // og kommentarfeltet er ikke nødvendigvis blant dem.
     Promise.all([
@@ -1102,21 +1291,42 @@
       })
     ]).then(function (results) {
       const attachmentsByOid = results[0];
-      const commentByOid = {};
+      const attrsByOid = {};
       results[1].features.forEach(function (f) {
-        commentByOid[f.attributes[oidField]] =
-          (f.attributes[REPORT_CONFIG.commentField] || "").toString().trim();
+        attrsByOid[f.attributes[oidField]] = f.attributes;
       });
 
       const slides = [];
       objectIds.forEach(function (oid) {
         const attachments = attachmentsByOid[oid];
         if (!attachments || !attachments.length) return;
-        slides.push({ url: attachments[0].url, comment: commentByOid[oid] || "" });
+        const attrs = attrsByOid[oid] || {};
+        slides.push({
+          url: attachments[0].url,
+          comment: (attrs[REPORT_CONFIG.commentField] || "").toString().trim(),
+          series: (attrs[REPORT_CONFIG.seriesField] || "").toString().trim()
+        });
       });
-      if (slides.length) openPhotoViewer(slides);
+      if (slides.length) openPhotoViewer(slides, activeSeries);
     }).catch(function (err) {
       console.warn("Kunne ikke hente bilder", err);
+    });
+  }
+
+  // Åpner alle bildene i en serie, uavhengig av hvor spredt de ligger geografisk
+  function showPhotosInSeries(series) {
+    if (!layerRefs.bilder || !series) return;
+
+    // Serienavnet er brukerskrevet tekst, så enkeltfnutter må dobles i SQL-en
+    const escaped = series.replace(/'/g, "''");
+    layerRefs.bilder.queryFeatures({
+      where: REPORT_CONFIG.seriesField + " = '" + escaped + "'",
+      outFields: ["*"],
+      returnGeometry: false
+    }).then(function (result) {
+      showPhotosForFeatures(result.features, series);
+    }).catch(function (err) {
+      console.warn("Kunne ikke hente bildeserien", err);
     });
   }
 
