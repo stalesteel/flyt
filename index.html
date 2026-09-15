@@ -57,7 +57,10 @@
 
   .fab svg { width: 22px; height: 22px; }
 
-  #info-btn { left: 16px; bottom: 24px; }
+  #info-btn { left: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); }
+
+  #measure-btn { left: 16px; bottom: 24px; }
+  #measure-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
   #browse-btn { left: 88px; bottom: 24px; }
 
@@ -262,6 +265,97 @@
     padding: 10px 18px 26px;
   }
   #info-sheet.open { transform: translateY(0); }
+
+  /* ---------------- POI ---------------- */
+  #pick-banner {
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 41;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: calc(100vw - 32px);
+    padding: 11px 14px;
+    border-radius: 12px;
+    background: rgba(28,28,28,0.92);
+    color: #fff;
+    font-size: 0.9rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  #pick-banner button {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    color: #9fd3b6;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 4px;
+  }
+
+  #poi-overlay, #poi-view-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 39;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  #poi-overlay.open, #poi-view-overlay.open { opacity: 1; pointer-events: auto; }
+
+  #poi-sheet, #poi-view-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 88vh;
+    background: var(--surface);
+    z-index: 40;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.2);
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    padding: 10px 18px calc(26px + env(safe-area-inset-bottom, 0px));
+  }
+  #poi-sheet.open, #poi-view-sheet.open { transform: translateY(0); }
+
+  .poi-position-choice { display: flex; gap: 8px; }
+  .poi-choice {
+    flex: 1;
+    padding: 11px 8px;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .poi-choice.active {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .poi-view-image {
+    width: 100%;
+    border-radius: var(--radius);
+    display: block;
+    margin-bottom: 14px;
+  }
+  .poi-view-description {
+    margin: 0;
+    font-size: 0.98rem;
+    line-height: 1.55;
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+  .poi-view-description:empty { display: none; }
 
   #browse-overlay {
     position: fixed;
@@ -655,6 +749,13 @@
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
 </button>
 
+<button class="fab" id="measure-btn" aria-label="Mål avstand">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2.5 15.5L15.5 2.5l6 6-13 13z"></path>
+    <path d="M6 12l2 2M9 9l2 2M12 6l2 2"></path>
+  </svg>
+</button>
+
 <button class="fab" id="browse-btn" aria-label="Bla gjennom bilder">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
     <rect x="8" y="3" width="13" height="13" rx="2"></rect>
@@ -714,6 +815,21 @@
         <span class="track"></span>
       </label>
     </div>
+    <div class="layer-row">
+      <span>POI</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-poi" checked>
+        <span class="track"></span>
+      </label>
+    </div>
+
+    <button type="button" class="menu-btn-row" id="new-poi-btn" style="margin-top: 14px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 10c0 6-9 13-9 13s-9-7-9-13a9 9 0 0 1 18 0z"></path>
+        <path d="M12 7v6M9 10h6"></path>
+      </svg>
+      <span>Ny POI</span>
+    </button>
   </div>
 
   <div class="menu-section">
@@ -808,6 +924,78 @@
   </div>
 </div>
 
+<!-- Plasseringsbanner ved markering i kartet -->
+<div id="pick-banner" hidden>
+  <span>Trykk i kartet for å plassere punktet</span>
+  <button type="button" id="pick-cancel">Avbryt</button>
+</div>
+
+<!-- Nytt POI-punkt -->
+<div id="poi-overlay"></div>
+<div id="poi-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <h2>Nytt punkt</h2>
+    <button type="button" class="close-btn" id="poi-close">✕</button>
+  </div>
+
+  <form id="poi-form">
+    <div class="card">
+      <span class="field-label">Posisjon</span>
+      <div class="poi-position-choice">
+        <button type="button" class="poi-choice active" id="poi-use-gps">Min posisjon</button>
+        <button type="button" class="poi-choice" id="poi-use-map">Marker i kartet</button>
+      </div>
+      <div class="location-row" style="margin-top: 12px;">
+        <span class="location-dot pending" id="poi-location-dot"></span>
+        <span class="location-text" id="poi-location-text">Henter posisjon…</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Tittel</span>
+      <input type="text" class="series-input" id="poi-title" maxlength="256" placeholder="F.eks. Fin badeplass" required>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Beskrivelse (valgfritt)</span>
+      <textarea id="poi-description" placeholder="Skriv en kort beskrivelse…" maxlength="1024"></textarea>
+    </div>
+
+    <div class="card">
+      <span class="field-label">Bilde (valgfritt)</span>
+      <input class="photo-input" type="file" id="poi-photo-input" accept="image/*">
+      <div class="photo-dropzone" id="poi-photo-dropzone">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z"></path>
+          <circle cx="12" cy="13" r="4"></circle>
+        </svg>
+        <span class="label">Legg til bilde</span>
+        <span class="hint">Ta bilde eller velg fra bibliotek</span>
+      </div>
+      <div class="photo-preview-wrap" id="poi-photo-wrap" hidden>
+        <img class="photo-preview" id="poi-photo-preview" alt="Forhåndsvisning av bilde">
+        <button type="button" class="photo-retake" id="poi-photo-change">Bytt bilde</button>
+      </div>
+    </div>
+
+    <button type="submit" class="submit-btn" id="poi-submit" disabled>Opprett punkt</button>
+    <div class="status-msg" id="poi-status"></div>
+  </form>
+</div>
+
+<!-- Visning av eksisterende POI -->
+<div id="poi-view-overlay"></div>
+<div id="poi-view-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <h2 id="poi-view-title">Punkt</h2>
+    <button type="button" class="close-btn" id="poi-view-close">✕</button>
+  </div>
+  <img class="poi-view-image" id="poi-view-image" alt="" hidden>
+  <p class="poi-view-description" id="poi-view-description"></p>
+</div>
+
 <!-- Bla gjennom bilder (serier / datoer) -->
 <div id="browse-overlay"></div>
 <div id="browse-sheet">
@@ -842,7 +1030,14 @@
     led: "LedOyeren",
     bilder: "BilderInnsjo",
     papirkart: "Nordre_Oyeren_tif",
-    nve: "Innsjodatabase2"
+    nve: "Innsjodatabase2",
+    poi: "POI_Innsjo"
+  };
+
+  const POI_CONFIG = {
+    featureLayerUrl: "https://services.arcgis.com/2JyTvMWQSnM2Vi8q/arcgis/rest/services/POI_Innsjo/FeatureServer/0",
+    titleField: "Title",
+    descriptionField: "Description"
   };
 
   // Bakgrunnskart å veksle mellom (hentet fra Geodata sitt UTM33-basemap-galleri).
@@ -886,6 +1081,9 @@
   // stille droppet mens resten av appen fortsatt virker.
   let highlightPhotosInMap = function () {};
   let clearPhotoHighlight = function () {};
+  let startPoiMapPicking = function () {};
+  let cancelPoiMapPicking = function () {};
+  let stopMeasuring = function () {};
 
   // ---------------------------------------------------------------------
   // Side-meny åpne/lukke (uavhengig av kartet)
@@ -904,6 +1102,7 @@
   // Info-flik (uavhengig av kartet)
   // ---------------------------------------------------------------------
   const infoBtn = document.getElementById("info-btn");
+  const measureBtn = document.getElementById("measure-btn");
   const infoOverlay = document.getElementById("info-overlay");
   const infoSheet = document.getElementById("info-sheet");
   const infoClose = document.getElementById("info-close");
@@ -1267,6 +1466,277 @@
   }
 
   // ---------------------------------------------------------------------
+  // POI — opprette og vise punkter av interesse
+  // ---------------------------------------------------------------------
+  const newPoiBtn = document.getElementById("new-poi-btn");
+  const poiOverlay = document.getElementById("poi-overlay");
+  const poiSheet = document.getElementById("poi-sheet");
+  const poiClose = document.getElementById("poi-close");
+  const poiForm = document.getElementById("poi-form");
+  const poiUseGps = document.getElementById("poi-use-gps");
+  const poiUseMap = document.getElementById("poi-use-map");
+  const poiLocationDot = document.getElementById("poi-location-dot");
+  const poiLocationText = document.getElementById("poi-location-text");
+  const poiTitle = document.getElementById("poi-title");
+  const poiDescription = document.getElementById("poi-description");
+  const poiPhotoInput = document.getElementById("poi-photo-input");
+  const poiPhotoDropzone = document.getElementById("poi-photo-dropzone");
+  const poiPhotoWrap = document.getElementById("poi-photo-wrap");
+  const poiPhotoPreview = document.getElementById("poi-photo-preview");
+  const poiPhotoChange = document.getElementById("poi-photo-change");
+  const poiSubmit = document.getElementById("poi-submit");
+  const poiStatus = document.getElementById("poi-status");
+
+  const pickBanner = document.getElementById("pick-banner");
+  const pickCancel = document.getElementById("pick-cancel");
+
+  let poiState = { position: null, imageBlob: null, submitting: false };
+
+  function openPoiForm() {
+    poiState = { position: null, imageBlob: null, submitting: false };
+    poiForm.reset();
+    poiPhotoWrap.hidden = true;
+    poiPhotoDropzone.hidden = false;
+    setPoiStatus("", "");
+    setPoiSource("gps");
+    poiOverlay.classList.add("open");
+    poiSheet.classList.add("open");
+    requestPoiLocation();
+  }
+  function closePoiForm() {
+    poiOverlay.classList.remove("open");
+    poiSheet.classList.remove("open");
+    cancelPoiMapPicking();
+  }
+
+  newPoiBtn.addEventListener("click", function () {
+    clearPhotoHighlight();
+    stopMeasuring();
+    closeMenu();
+    openPoiForm();
+  });
+  poiClose.addEventListener("click", closePoiForm);
+  poiOverlay.addEventListener("click", closePoiForm);
+
+  function setPoiSource(source) {
+    poiUseGps.classList.toggle("active", source === "gps");
+    poiUseMap.classList.toggle("active", source === "map");
+  }
+
+  poiUseGps.addEventListener("click", function () {
+    setPoiSource("gps");
+    cancelPoiMapPicking();
+    requestPoiLocation();
+  });
+
+  poiUseMap.addEventListener("click", function () {
+    setPoiSource("map");
+    poiState.position = null;
+    updatePoiSubmitState();
+    poiLocationDot.className = "location-dot pending";
+    poiLocationText.textContent = "Velg et sted i kartet…";
+
+    // Fliken trekkes vekk så brukeren ser kartet mens han peker
+    poiSheet.classList.remove("open");
+    poiOverlay.classList.remove("open");
+    pickBanner.hidden = false;
+    startPoiMapPicking();
+  });
+
+  pickCancel.addEventListener("click", function () {
+    cancelPoiMapPicking();
+    setPoiSource("gps");
+    requestPoiLocation();
+    poiOverlay.classList.add("open");
+    poiSheet.classList.add("open");
+  });
+
+  // Kalles fra kartet når brukeren har pekt ut et sted
+  function onPoiLocationPicked(lon, lat) {
+    poiState.position = { lat: lat, lon: lon };
+    poiLocationDot.className = "location-dot ok";
+    poiLocationText.textContent = "Posisjon valgt i kartet";
+    pickBanner.hidden = true;
+    poiOverlay.classList.add("open");
+    poiSheet.classList.add("open");
+    updatePoiSubmitState();
+  }
+
+  function requestPoiLocation() {
+    poiState.position = null;
+    poiLocationDot.className = "location-dot pending";
+    poiLocationText.textContent = "Henter posisjon…";
+    updatePoiSubmitState();
+
+    if (!("geolocation" in navigator)) {
+      poiLocationDot.className = "location-dot err";
+      poiLocationText.textContent = "Posisjon støttes ikke i denne nettleseren.";
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      if (!poiUseGps.classList.contains("active")) return;
+      poiState.position = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+      poiLocationDot.className = "location-dot ok";
+      poiLocationText.innerHTML = "Posisjon funnet <span class=\"coords\">(±" + Math.round(pos.coords.accuracy) + " m)</span>";
+      updatePoiSubmitState();
+    }, function (err) {
+      if (!poiUseGps.classList.contains("active")) return;
+      poiLocationDot.className = "location-dot err";
+      poiLocationText.textContent = err.code === err.PERMISSION_DENIED
+        ? "Posisjon avslått. Marker i kartet i stedet."
+        : "Fikk ikke posisjon. Marker i kartet i stedet.";
+      updatePoiSubmitState();
+    }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  }
+
+  poiPhotoDropzone.addEventListener("click", function () { poiPhotoInput.click(); });
+  poiPhotoChange.addEventListener("click", function () { poiPhotoInput.click(); });
+
+  poiPhotoInput.addEventListener("change", function () {
+    const file = poiPhotoInput.files && poiPhotoInput.files[0];
+    if (!file) return;
+    compressImage(file, REPORT_CONFIG.maxImageDimension, REPORT_CONFIG.jpegQuality).then(function (blob) {
+      poiState.imageBlob = blob;
+      poiPhotoPreview.src = URL.createObjectURL(blob);
+      poiPhotoWrap.hidden = false;
+      poiPhotoDropzone.hidden = true;
+    }).catch(function () {
+      setPoiStatus("Klarte ikke å lese bildet. Prøv igjen.", "error");
+    });
+  });
+
+  poiTitle.addEventListener("input", updatePoiSubmitState);
+
+  function updatePoiSubmitState() {
+    poiSubmit.disabled = !poiState.position || !poiTitle.value.trim() || poiState.submitting;
+  }
+  function setPoiStatus(text, kind) {
+    poiStatus.textContent = text;
+    poiStatus.className = "status-msg" + (kind ? " " + kind : "");
+  }
+
+  poiForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (!poiState.position || !poiTitle.value.trim() || poiState.submitting) return;
+
+    poiState.submitting = true;
+    updatePoiSubmitState();
+    poiSubmit.innerHTML = "<span class=\"spinner\"></span>Oppretter…";
+    setPoiStatus("", "");
+
+    submitPoi()
+      .then(function () {
+        closePoiForm();
+        if (layerRefs.poi) layerRefs.poi.refresh();
+      })
+      .catch(function (err) {
+        console.error(err);
+        setPoiStatus("Noe gikk galt. Prøv igjen.", "error");
+      })
+      .finally(function () {
+        poiState.submitting = false;
+        poiSubmit.textContent = "Opprett punkt";
+        updatePoiSubmitState();
+      });
+  });
+
+  async function submitPoi() {
+    const attributes = {};
+    attributes[POI_CONFIG.titleField] = poiTitle.value.trim();
+    const description = poiDescription.value.trim();
+    if (description) attributes[POI_CONFIG.descriptionField] = description;
+
+    const feature = {
+      geometry: {
+        x: poiState.position.lon,
+        y: poiState.position.lat,
+        spatialReference: { wkid: 4326 }
+      },
+      attributes: attributes
+    };
+
+    const addBody = new URLSearchParams();
+    addBody.set("f", "json");
+    addBody.set("features", JSON.stringify([feature]));
+
+    const addResp = await fetch(POI_CONFIG.featureLayerUrl + "/addFeatures", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: addBody.toString()
+    });
+    const addJson = await addResp.json();
+    if (addJson.error) throw new Error("addFeatures: " + (addJson.error.message || JSON.stringify(addJson.error)));
+
+    const result = (addJson.addResults || [])[0];
+    if (!result || !result.success) throw new Error("addFeatures feilet: " + JSON.stringify(result));
+
+    if (!poiState.imageBlob) return;
+
+    const attachForm = new FormData();
+    attachForm.set("f", "json");
+    attachForm.set("attachment", poiState.imageBlob, "poi.jpg");
+
+    const attachResp = await fetch(POI_CONFIG.featureLayerUrl + "/" + result.objectId + "/addAttachment", {
+      method: "POST",
+      body: attachForm
+    });
+    const attachJson = await attachResp.json();
+    if (attachJson.error || !(attachJson.addAttachmentResult && attachJson.addAttachmentResult.success)) {
+      throw new Error("addAttachment feilet: " + JSON.stringify(attachJson));
+    }
+  }
+
+  // ---------------- Visning av eksisterende POI ----------------
+  const poiViewOverlay = document.getElementById("poi-view-overlay");
+  const poiViewSheet = document.getElementById("poi-view-sheet");
+  const poiViewClose = document.getElementById("poi-view-close");
+  const poiViewTitle = document.getElementById("poi-view-title");
+  const poiViewImage = document.getElementById("poi-view-image");
+  const poiViewDescription = document.getElementById("poi-view-description");
+
+  function closePoiView() {
+    poiViewOverlay.classList.remove("open");
+    poiViewSheet.classList.remove("open");
+  }
+  poiViewClose.addEventListener("click", closePoiView);
+  poiViewOverlay.addEventListener("click", closePoiView);
+
+  function showPoi(graphic) {
+    if (!layerRefs.poi) return;
+
+    const oidField = layerRefs.poi.objectIdField || "OBJECTID";
+    const objectId = graphic.attributes[oidField];
+
+    // Attributtene hentes fra serveren — grafikken har bare feltene laget har lastet ned
+    Promise.all([
+      layerRefs.poi.queryFeatures({ objectIds: [objectId], outFields: ["*"], returnGeometry: false }),
+      layerRefs.poi.queryAttachments({ objectIds: [objectId] }).catch(function () { return {}; })
+    ]).then(function (results) {
+      const feature = results[0].features[0];
+      if (!feature) return;
+
+      const attrs = feature.attributes;
+      poiViewTitle.textContent = (attrs[POI_CONFIG.titleField] || "Punkt").toString();
+      poiViewDescription.textContent = (attrs[POI_CONFIG.descriptionField] || "").toString();
+
+      const attachments = results[1][objectId];
+      if (attachments && attachments.length) {
+        poiViewImage.src = attachments[0].url;
+        poiViewImage.hidden = false;
+      } else {
+        poiViewImage.removeAttribute("src");
+        poiViewImage.hidden = true;
+      }
+
+      poiViewOverlay.classList.add("open");
+      poiViewSheet.classList.add("open");
+    }).catch(function (err) {
+      console.warn("Kunne ikke hente punktet", err);
+    });
+  }
+
+  // ---------------------------------------------------------------------
   // Bla gjennom bilder — velg en bildeserie eller en dato, og sveip gjennom
   // ---------------------------------------------------------------------
   const browseBtn = document.getElementById("browse-btn");
@@ -1296,7 +1766,7 @@
 
   // Markeringen i kartet står til brukeren tar et nytt aktivt valg. Å lukke
   // eller sveipe i bildevisningen teller ikke — da vil man se den igjen.
-  [menuBtn, infoBtn, browseBtn, cameraBtn].forEach(function (btn) {
+  [menuBtn, infoBtn, browseBtn, cameraBtn, measureBtn].forEach(function (btn) {
     btn.addEventListener("click", function () { clearPhotoHighlight(); });
   });
 
@@ -1697,8 +2167,9 @@
       "esri/layers/GraphicsLayer",
       "esri/layers/TileLayer",
       "esri/layers/VectorTileLayer",
-      "esri/Basemap"
-    ], function (WebMap, MapView, Graphic, Point, GraphicsLayer, TileLayer, VectorTileLayer, Basemap) {
+      "esri/Basemap",
+      "esri/widgets/DistanceMeasurement2D"
+    ], function (WebMap, MapView, Graphic, Point, GraphicsLayer, TileLayer, VectorTileLayer, Basemap, DistanceMeasurement2D) {
 
       const webmap = new WebMap({
         portalItem: { id: WEBMAP_ID }
@@ -1749,6 +2220,47 @@
         if (layerRefs.bilder) layerRefs.bilder.opacity = 1;
       };
 
+      // ---------------- Plassering av nytt POI ved klikk i kartet ----------------
+      let pickingPoiLocation = false;
+
+      function setPoiPicking(active) {
+        pickingPoiLocation = active;
+        view.container.style.cursor = active ? "crosshair" : "";
+      }
+
+      startPoiMapPicking = function () { setPoiPicking(true); };
+      cancelPoiMapPicking = function () {
+        setPoiPicking(false);
+        pickBanner.hidden = true;
+      };
+
+      // ---------------- Avstandsmåling ----------------
+      let measurement = null;
+
+      stopMeasuring = function () {
+        if (!measurement) return;
+        view.ui.remove(measurement);
+        measurement.destroy();
+        measurement = null;
+        measureBtn.classList.remove("active");
+      };
+
+      measureBtn.addEventListener("click", function () {
+        if (measurement) {
+          stopMeasuring();
+          return;
+        }
+        clearPhotoHighlight();
+        cancelPoiMapPicking();
+
+        measurement = new DistanceMeasurement2D({ view: view, unit: "meters" });
+        view.ui.add(measurement, "top-right");
+        measurement.viewModel.start().catch(function (err) {
+          console.warn("Kunne ikke starte målingen", err);
+        });
+        measureBtn.classList.add("active");
+      });
+
       // Flytt kartets innebygde zoom-knapper vekk fra øverste venstre hjørne,
       // slik at de ikke kolliderer med hamburgermeny-knappen (#menu-btn).
       view.ui.move("zoom", "top-right");
@@ -1774,21 +2286,39 @@
         if (layerRefs.led) document.getElementById("toggle-led").checked = layerRefs.led.visible;
         if (layerRefs.bilder) document.getElementById("toggle-bilder").checked = layerRefs.bilder.visible;
         if (layerRefs.nve) document.getElementById("toggle-nve").checked = layerRefs.nve.visible;
+        if (layerRefs.poi) document.getElementById("toggle-poi").checked = layerRefs.poi.visible;
 
         // Rasterkartet (papirkart) skal alltid starte avslått, uavhengig av lagret synlighet i web-kartet
         if (layerRefs.papirkart) layerRefs.papirkart.visible = document.getElementById("toggle-papirkart").checked;
 
-        if (!layerRefs.bilder) return;
-
         // LayerView trengs for å spørre opp hvilke punkter et cluster består av
         let bilderLayerView = null;
-        view.whenLayerView(layerRefs.bilder).then(function (lv) { bilderLayerView = lv; });
+        if (layerRefs.bilder) {
+          view.whenLayerView(layerRefs.bilder).then(function (lv) { bilderLayerView = lv; });
+        }
 
         view.on("click", function (event) {
-          view.hitTest(event, { include: layerRefs.bilder }).then(function (response) {
+          // Under plassering av et nytt POI tolkes klikket som et sted, ikke et treff
+          if (pickingPoiLocation) {
+            event.stopPropagation();
+            const point = event.mapPoint;
+            if (point) onPoiLocationPicked(point.longitude, point.latitude);
+            setPoiPicking(false);
+            return;
+          }
+          if (measurement) return;
+
+          const include = [layerRefs.poi, layerRefs.bilder].filter(Boolean);
+          if (!include.length) return;
+
+          view.hitTest(event, { include: include }).then(function (response) {
             const hit = (response.results || [])[0];
             if (!hit || !hit.graphic) return;
 
+            if (layerRefs.poi && hit.graphic.layer === layerRefs.poi) {
+              showPoi(hit.graphic);
+              return;
+            }
             if (!hit.graphic.isAggregate) {
               showSeriesForPhoto(hit.graphic);
               return;
@@ -1824,6 +2354,10 @@
       document.getElementById("toggle-nve").addEventListener("change", function (e) {
         clearPhotoHighlight();
         if (layerRefs.nve) layerRefs.nve.visible = e.target.checked;
+      });
+      document.getElementById("toggle-poi").addEventListener("change", function (e) {
+        clearPhotoHighlight();
+        if (layerRefs.poi) layerRefs.poi.visible = e.target.checked;
       });
 
       // ---------------- Basemap-veksling ----------------
