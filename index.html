@@ -1551,6 +1551,15 @@
     poiSheet.classList.add("open");
   });
 
+  function onPoiLocationFailed() {
+    pickBanner.hidden = true;
+    poiOverlay.classList.add("open");
+    poiSheet.classList.add("open");
+    poiLocationDot.className = "location-dot err";
+    poiLocationText.textContent = "Klarte ikke å lese posisjonen. Prøv igjen.";
+    updatePoiSubmitState();
+  }
+
   // Kalles fra kartet når brukeren har pekt ut et sted
   function onPoiLocationPicked(lon, lat) {
     poiState.position = { lat: lat, lon: lon };
@@ -2168,8 +2177,9 @@
       "esri/layers/TileLayer",
       "esri/layers/VectorTileLayer",
       "esri/Basemap",
-      "esri/widgets/DistanceMeasurement2D"
-    ], function (WebMap, MapView, Graphic, Point, GraphicsLayer, TileLayer, VectorTileLayer, Basemap, DistanceMeasurement2D) {
+      "esri/widgets/DistanceMeasurement2D",
+      "esri/geometry/projection"
+    ], function (WebMap, MapView, Graphic, Point, GraphicsLayer, TileLayer, VectorTileLayer, Basemap, DistanceMeasurement2D, projection) {
 
       const webmap = new WebMap({
         portalItem: { id: WEBMAP_ID }
@@ -2222,6 +2232,27 @@
 
       // ---------------- Plassering av nytt POI ved klikk i kartet ----------------
       let pickingPoiLocation = false;
+
+      // Kartet står i UTM33 (EPSG:25833), så et klikkpunkt har verken longitude
+      // eller latitude — det må projiseres til WGS84 før det kan sendes inn.
+      projection.load().catch(function (err) {
+        console.warn("Kunne ikke laste projeksjonsmotoren", err);
+      });
+
+      function toLonLat(point) {
+        if (!point) return null;
+        if (point.longitude !== null && point.longitude !== undefined) {
+          return { lon: point.longitude, lat: point.latitude };
+        }
+        try {
+          const projected = projection.project(point, { wkid: 4326 });
+          if (!projected) return null;
+          return { lon: projected.x, lat: projected.y };
+        } catch (err) {
+          console.warn("Kunne ikke projisere punktet", err);
+          return null;
+        }
+      }
 
       function setPoiPicking(active) {
         pickingPoiLocation = active;
@@ -2301,9 +2332,10 @@
           // Under plassering av et nytt POI tolkes klikket som et sted, ikke et treff
           if (pickingPoiLocation) {
             event.stopPropagation();
-            const point = event.mapPoint;
-            if (point) onPoiLocationPicked(point.longitude, point.latitude);
+            const coords = toLonLat(event.mapPoint);
             setPoiPicking(false);
+            if (coords) onPoiLocationPicked(coords.lon, coords.lat);
+            else onPoiLocationFailed();
             return;
           }
           if (measurement) return;
