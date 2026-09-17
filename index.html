@@ -1005,7 +1005,7 @@
 <div id="measure-sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <h2>Mål avstand</h2>
+    <h2>Mål avstand og kjøretid</h2>
     <button type="button" class="measure-restart" id="measure-restart">Ny måling</button>
     <button type="button" class="close-btn" id="measure-close">✕</button>
   </div>
@@ -2474,11 +2474,22 @@
         });
       }
 
-      // Kalles fra klikkhåndteringen i kartet
-      function addMeasurePoint(mapPoint) {
-        measureVertices.push(mapPoint);
-        redrawMeasurement();
-      }
+      // "click" venter på dobbeltklikk-vinduet før den utløses, noe som ga en
+      // merkbar forsinkelse på punktet. "immediate-click" kommer med en gang,
+      // men skiller ikke selv mellom et trykk og en panorering — derfor holdes
+      // det styr på om fingeren har dratt siden den ble satt ned.
+      let pointerDragged = false;
+      view.on("pointer-down", function () { pointerDragged = false; });
+      view.on("drag", function () { pointerDragged = true; });
+
+      view.on("immediate-click", function (event) {
+        if (!measuring || pointerDragged) return;
+        event.stopPropagation();
+        if (event.mapPoint) {
+          measureVertices.push(event.mapPoint);
+          redrawMeasurement();
+        }
+      });
 
       restartMeasuring = function () {
         measureVertices = [];
@@ -2516,15 +2527,16 @@
       // slik at de ikke kolliderer med hamburgermeny-knappen (#menu-btn).
       view.ui.move("zoom", "top-right");
 
-      // Standard-popup slås av — klikk på bilder/cluster håndteres av egen bildevisning
-      view.popupEnabled = false;
-
       view.when(function () {
         // Legges til først her, ikke ved oppstart: webkartets egne lag lastes
         // asynkront og ville ellers havnet oppå grafikklagene
         view.map.add(selectionGraphicsLayer);
         view.map.add(measureGraphicsLayer);
         view.map.add(locationGraphicsLayer);
+
+        // Får tegnelaget klart på forhånd, så første målepunkt ikke venter på
+        // at laget skal initialiseres
+        view.whenLayerView(measureGraphicsLayer).catch(function () {});
 
         webmap.layers.forEach(function (layer) {
           Object.keys(LAYER_TITLES).forEach(function (key) {
@@ -2539,6 +2551,11 @@
         if (layerRefs.bilder) document.getElementById("toggle-bilder").checked = layerRefs.bilder.visible;
         if (layerRefs.nve) document.getElementById("toggle-nve").checked = layerRefs.nve.visible;
         if (layerRefs.poi) document.getElementById("toggle-poi").checked = layerRefs.poi.visible;
+
+        // Popup slås bare av for lagene appen håndterer selv. Øvrige lag beholder
+        // popup-en slik den er satt opp i webkartet i AGOL.
+        if (layerRefs.bilder) layerRefs.bilder.popupEnabled = false;
+        if (layerRefs.poi) layerRefs.poi.popupEnabled = false;
 
         // Rasterkartet (papirkart) skal alltid starte avslått, uavhengig av lagret synlighet i web-kartet
         if (layerRefs.papirkart) layerRefs.papirkart.visible = document.getElementById("toggle-papirkart").checked;
@@ -2559,11 +2576,9 @@
             else onPoiLocationFailed();
             return;
           }
-          if (measuring) {
-            event.stopPropagation();
-            if (event.mapPoint) addMeasurePoint(event.mapPoint);
-            return;
-          }
+          // Målepunkter settes i immediate-click lenger nede, som slipper
+          // ventetiden click har for å skille seg fra dobbeltklikk
+          if (measuring) return;
 
           const include = [layerRefs.poi, layerRefs.bilder].filter(Boolean);
           if (!include.length) return;
