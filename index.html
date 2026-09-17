@@ -2605,7 +2605,8 @@
           geometry: mapPoint,
           layerIds: SAMFERDSEL_SUBLAYERS,
           layerOption: "visible",
-          tolerance: 8,
+          // Romslig nok til å treffe med finger på mobil
+          tolerance: 15,
           returnGeometry: false,
           mapExtent: view.extent,
           width: view.width,
@@ -2662,22 +2663,14 @@
         });
       }
 
-      // "click" venter på dobbeltklikk-vinduet før den utløses, noe som ga en
-      // merkbar forsinkelse på punktet. "immediate-click" kommer med en gang,
-      // men skiller ikke selv mellom et trykk og en panorering — derfor holdes
-      // det styr på om fingeren har dratt siden den ble satt ned.
+      // All klikkhåndtering går på "immediate-click". "click" venter på
+      // dobbeltklikk-vinduet, og to raske trykk tolkes da som dobbeltklikk —
+      // da uteble klikket helt, og man måtte trykke flere ganger for å få svar.
+      // "immediate-click" skiller ikke selv trykk fra panorering, så det holdes
+      // styr på om fingeren har dratt siden den ble satt ned.
       let pointerDragged = false;
       view.on("pointer-down", function () { pointerDragged = false; });
       view.on("drag", function () { pointerDragged = true; });
-
-      view.on("immediate-click", function (event) {
-        if (!measuring || pointerDragged) return;
-        event.stopPropagation();
-        if (event.mapPoint) {
-          measureVertices.push(event.mapPoint);
-          redrawMeasurement();
-        }
-      });
 
       restartMeasuring = function () {
         measureVertices = [];
@@ -2752,7 +2745,10 @@
           view.whenLayerView(layerRefs.bilder).then(function (lv) { bilderLayerView = lv; });
         }
 
-        view.on("click", function (event) {
+        view.on("immediate-click", function (event) {
+          // Panorering skal ikke telle som et trykk
+          if (pointerDragged) return;
+
           // Under plassering av et nytt POI tolkes klikket som et sted, ikke et treff
           if (pickingPoiLocation) {
             event.stopPropagation();
@@ -2762,12 +2758,21 @@
             else onPoiLocationFailed();
             return;
           }
-          // Målepunkter settes i immediate-click lenger nede, som slipper
-          // ventetiden click har for å skille seg fra dobbeltklikk
-          if (measuring) return;
+
+          if (measuring) {
+            event.stopPropagation();
+            if (event.mapPoint) {
+              measureVertices.push(event.mapPoint);
+              redrawMeasurement();
+            }
+            return;
+          }
 
           const include = [layerRefs.poi, layerRefs.bilder].filter(Boolean);
-          if (!include.length) return;
+          if (!include.length) {
+            identifySamferdsel(event.mapPoint);
+            return;
+          }
 
           view.hitTest(event, { include: include }).then(function (response) {
             const hit = (response.results || [])[0];
