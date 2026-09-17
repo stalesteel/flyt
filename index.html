@@ -394,7 +394,7 @@
   .feature-row .v { font-weight: 600; text-align: right; min-width: 0; }
   .feature-empty { color: var(--text-muted); font-size: 0.92rem; }
 
-  #poi-overlay, #poi-view-overlay, #feature-overlay {
+  #poi-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.35);
@@ -403,7 +403,7 @@
     pointer-events: none;
     transition: opacity 0.2s ease;
   }
-  #poi-overlay.open, #poi-view-overlay.open, #feature-overlay.open { opacity: 1; pointer-events: auto; }
+  #poi-overlay.open { opacity: 1; pointer-events: auto; }
 
   #poi-sheet, #poi-view-sheet, #feature-sheet {
     position: fixed;
@@ -1112,8 +1112,7 @@
   </form>
 </div>
 
-<!-- Visning av eksisterende POI -->
-<div id="poi-view-overlay"></div>
+<!-- Visning av eksisterende POI. Ingen overlay, av samme grunn som over -->
 <div id="poi-view-sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
@@ -1124,8 +1123,8 @@
   <p class="poi-view-description" id="poi-view-description"></p>
 </div>
 
-<!-- Visning av punkter fra Samferdselslaget -->
-<div id="feature-overlay"></div>
+<!-- Visning av punkter fra Samferdselslaget.
+     Ingen overlay: kartet må kunne klikkes videre mens fliken står åpen -->
 <div id="feature-sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
@@ -1265,6 +1264,8 @@
   let cancelPoiMapPicking = function () {};
   let stopMeasuring = function () {};
   let restartMeasuring = function () {};
+  let setInspectHighlight = function () {};
+  let clearInspectHighlight = function () {};
 
   // ---------------------------------------------------------------------
   // Side-meny åpne/lukke (uavhengig av kartet)
@@ -1938,7 +1939,6 @@
   }
 
   // ---------------- Visning av eksisterende POI ----------------
-  const poiViewOverlay = document.getElementById("poi-view-overlay");
   const poiViewSheet = document.getElementById("poi-view-sheet");
   const poiViewClose = document.getElementById("poi-view-close");
   const poiViewTitle = document.getElementById("poi-view-title");
@@ -1946,14 +1946,18 @@
   const poiViewDescription = document.getElementById("poi-view-description");
 
   function closePoiView() {
-    poiViewOverlay.classList.remove("open");
     poiViewSheet.classList.remove("open");
   }
-  poiViewClose.addEventListener("click", closePoiView);
-  poiViewOverlay.addEventListener("click", closePoiView);
+  poiViewClose.addEventListener("click", function () {
+    closePoiView();
+    clearInspectHighlight();
+  });
 
   function showPoi(graphic) {
     if (!layerRefs.poi) return;
+
+    closeFeatureSheet();
+    setInspectHighlight(graphic.geometry);
 
     const oidField = layerRefs.poi.objectIdField || "OBJECTID";
     const objectId = graphic.attributes[oidField];
@@ -1979,7 +1983,6 @@
         poiViewImage.hidden = true;
       }
 
-      poiViewOverlay.classList.add("open");
       poiViewSheet.classList.add("open");
     }).catch(function (err) {
       console.warn("Kunne ikke hente punktet", err);
@@ -1989,7 +1992,6 @@
   // ---------------------------------------------------------------------
   // Visning av punkter fra Samferdselslaget
   // ---------------------------------------------------------------------
-  const featureOverlay = document.getElementById("feature-overlay");
   const featureSheet = document.getElementById("feature-sheet");
   const featureClose = document.getElementById("feature-close");
   const featureTitle = document.getElementById("feature-title");
@@ -1997,11 +1999,19 @@
   const featureFields = document.getElementById("feature-fields");
 
   function closeFeatureSheet() {
-    featureOverlay.classList.remove("open");
     featureSheet.classList.remove("open");
   }
-  featureClose.addEventListener("click", closeFeatureSheet);
-  featureOverlay.addEventListener("click", closeFeatureSheet);
+  featureClose.addEventListener("click", function () {
+    closeFeatureSheet();
+    clearInspectHighlight();
+  });
+
+  // Lukker begge "se på objekt"-flikene og fjerner markeringen i kartet
+  function closeInspectSheets() {
+    closeFeatureSheet();
+    closePoiView();
+    clearInspectHighlight();
+  }
 
   // result er ett treff fra identify: { layerId, layerName, feature: { attributes } }
   function showSamferdselFeature(result) {
@@ -2048,7 +2058,8 @@
       featureFields.appendChild(empty);
     }
 
-    featureOverlay.classList.add("open");
+    closePoiView();
+    setInspectHighlight(result.feature && result.feature.geometry);
     featureSheet.classList.add("open");
   }
 
@@ -2539,6 +2550,26 @@
       // resten av bildelaget dempes med opasitet i stedet.
       const selectionGraphicsLayer = new GraphicsLayer({ title: "Valgte bilder" });
 
+      // Ring rundt objektet som vises i en flik akkurat nå
+      const inspectGraphicsLayer = new GraphicsLayer({ title: "Valgt objekt" });
+
+      setInspectHighlight = function (geometry) {
+        inspectGraphicsLayer.removeAll();
+        if (!geometry) return;
+        inspectGraphicsLayer.add(new Graphic({
+          geometry: geometry,
+          symbol: {
+            type: "simple-marker",
+            style: "circle",
+            color: [0, 0, 0, 0],
+            size: 34,
+            outline: { color: [0, 230, 118, 1], width: 3 }
+          }
+        }));
+      };
+
+      clearInspectHighlight = function () { inspectGraphicsLayer.removeAll(); };
+
       highlightPhotosInMap = function (objectIds) {
         clearPhotoHighlight();
         if (!layerRefs.bilder || !objectIds.length) return;
@@ -2658,7 +2689,10 @@
 
       // ---------------- Oppslag i Samferdselslaget ----------------
       function identifySamferdsel(mapPoint) {
-        if (!layerRefs.samferdsel || !mapPoint || !layerRefs.samferdsel.visible) return;
+        if (!layerRefs.samferdsel || !mapPoint || !layerRefs.samferdsel.visible) {
+          closeInspectSheets();
+          return;
+        }
 
         const params = new IdentifyParameters({
           geometry: mapPoint,
@@ -2666,7 +2700,8 @@
           layerOption: "visible",
           // Romslig nok til å treffe med finger på mobil
           tolerance: 15,
-          returnGeometry: false,
+          // Geometrien trengs for å markere det valgte symbolet i kartet
+          returnGeometry: true,
           mapExtent: view.extent,
           width: view.width,
           height: view.height,
@@ -2676,8 +2711,10 @@
         identify.identify(layerRefs.samferdsel.url, params).then(function (response) {
           const result = (response.results || [])[0];
           if (result) showSamferdselFeature(result);
+          else closeInspectSheets();
         }).catch(function (err) {
           console.warn("Kunne ikke slå opp punktet i Samferdsel", err);
+          closeInspectSheets();
         });
       }
 
@@ -2772,6 +2809,7 @@
         // asynkront og ville ellers havnet oppå grafikklagene
         view.map.add(selectionGraphicsLayer);
         view.map.add(measureGraphicsLayer);
+        view.map.add(inspectGraphicsLayer);
         view.map.add(locationGraphicsLayer);
 
         // Får tegnelaget klart på forhånd, så første målepunkt ikke venter på
@@ -2848,6 +2886,9 @@
               showPoi(hit.graphic);
               return;
             }
+
+            // Bildevisningen tar over skjermen, så objekt-flikene lukkes
+            closeInspectSheets();
             if (!hit.graphic.isAggregate) {
               showSeriesForPhoto(hit.graphic);
               return;
