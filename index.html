@@ -286,7 +286,7 @@
   #measure-sheet .sheet-handle { margin: 4px auto 8px; }
   #measure-sheet .sheet-header { margin-bottom: 10px; gap: 10px; }
 
-  .measure-restart {
+  .measure-restart, .sheet-action {
     flex-shrink: 0;
     padding: 7px 12px;
     border: 1.5px solid var(--border);
@@ -1068,12 +1068,12 @@
 <div id="poi-sheet">
   <div class="sheet-handle"></div>
   <div class="sheet-header">
-    <h2>Nytt punkt</h2>
+    <h2 id="poi-form-title">Nytt punkt</h2>
     <button type="button" class="close-btn" id="poi-close">✕</button>
   </div>
 
   <form id="poi-form">
-    <div class="card">
+    <div class="card" id="poi-position-card">
       <span class="field-label">Posisjon</span>
       <div class="poi-position-choice">
         <button type="button" class="poi-choice active" id="poi-use-gps">Min posisjon</button>
@@ -1122,6 +1122,7 @@
   <div class="sheet-handle"></div>
   <div class="sheet-header">
     <h2 id="poi-view-title">Punkt</h2>
+    <button type="button" class="sheet-action" id="poi-edit">Rediger</button>
     <button type="button" class="close-btn" id="poi-view-close">✕</button>
   </div>
   <img class="poi-view-image" id="poi-view-image" alt="" hidden>
@@ -1221,7 +1222,8 @@
   const POI_CONFIG = {
     featureLayerUrl: "https://services.arcgis.com/2JyTvMWQSnM2Vi8q/arcgis/rest/services/POI_Innsjo/FeatureServer/0",
     titleField: "Title",
-    descriptionField: "Description"
+    descriptionField: "Description",
+    objectIdField: "OBJECTID"
   };
 
   // Bakgrunnskart å veksle mellom (hentet fra Geodata sitt UTM33-basemap-galleri).
@@ -1737,18 +1739,60 @@
   const pickBanner = document.getElementById("pick-banner");
   const pickCancel = document.getElementById("pick-cancel");
 
-  let poiState = { position: null, imageBlob: null, submitting: false };
+  const poiFormTitle = document.getElementById("poi-form-title");
+  const poiPositionCard = document.getElementById("poi-position-card");
+  const poiEditBtn = document.getElementById("poi-edit");
+
+  // editing holder objectId og attachmentId når et eksisterende punkt endres
+  let poiState = { position: null, imageBlob: null, submitting: false, editing: null };
 
   function openPoiForm() {
-    poiState = { position: null, imageBlob: null, submitting: false };
+    poiState = { position: null, imageBlob: null, submitting: false, editing: null };
     poiForm.reset();
     poiPhotoWrap.hidden = true;
     poiPhotoDropzone.hidden = false;
+    poiFormTitle.textContent = "Nytt punkt";
+    poiPositionCard.hidden = false;
+    poiSubmit.textContent = "Opprett punkt";
     setPoiStatus("", "");
     setPoiSource("gps");
     poiOverlay.classList.add("open");
     poiSheet.classList.add("open");
     requestPoiLocation();
+  }
+
+  // Redigering av et eksisterende punkt. Posisjonen røres ikke, så
+  // posisjonskortet skjules og punktets egen posisjon beholdes.
+  function openPoiEditForm(poi) {
+    poiState = {
+      position: null,
+      imageBlob: null,
+      submitting: false,
+      editing: { objectId: poi.objectId, attachmentId: poi.attachmentId }
+    };
+
+    poiForm.reset();
+    poiFormTitle.textContent = "Rediger punkt";
+    poiPositionCard.hidden = true;
+    poiSubmit.textContent = "Lagre endringer";
+    setPoiStatus("", "");
+
+    poiTitle.value = poi.title || "";
+    poiDescription.value = poi.description || "";
+
+    if (poi.imageUrl) {
+      poiPhotoPreview.src = poi.imageUrl;
+      poiPhotoWrap.hidden = false;
+      poiPhotoDropzone.hidden = true;
+    } else {
+      poiPhotoWrap.hidden = true;
+      poiPhotoDropzone.hidden = false;
+    }
+
+    closePoiView();
+    poiOverlay.classList.add("open");
+    poiSheet.classList.add("open");
+    updatePoiSubmitState();
   }
   function closePoiForm() {
     poiOverlay.classList.remove("open");
@@ -1865,7 +1909,9 @@
   poiTitle.addEventListener("input", updatePoiSubmitState);
 
   function updatePoiSubmitState() {
-    poiSubmit.disabled = !poiState.position || !poiTitle.value.trim() || poiState.submitting;
+    // Ved redigering beholdes punktets egen posisjon, så den kreves ikke på nytt
+    const hasPosition = poiState.editing ? true : !!poiState.position;
+    poiSubmit.disabled = !hasPosition || !poiTitle.value.trim() || poiState.submitting;
   }
   function setPoiStatus(text, kind) {
     poiStatus.textContent = text;
@@ -1874,28 +1920,78 @@
 
   poiForm.addEventListener("submit", function (e) {
     e.preventDefault();
-    if (!poiState.position || !poiTitle.value.trim() || poiState.submitting) return;
+    const editing = poiState.editing;
+    if ((!editing && !poiState.position) || !poiTitle.value.trim() || poiState.submitting) return;
 
     poiState.submitting = true;
     updatePoiSubmitState();
-    poiSubmit.innerHTML = "<span class=\"spinner\"></span>Oppretter…";
+    poiSubmit.innerHTML = editing
+      ? "<span class=\"spinner\"></span>Lagrer…"
+      : "<span class=\"spinner\"></span>Oppretter…";
     setPoiStatus("", "");
 
-    submitPoi()
+    (editing ? updatePoi() : submitPoi())
       .then(function () {
         closePoiForm();
         if (layerRefs.poi) layerRefs.poi.refresh();
+        if (editing) showPoiById(editing.objectId);
       })
       .catch(function (err) {
         console.error(err);
-        setPoiStatus("Noe gikk galt. Prøv igjen.", "error");
+        setPoiStatus(editing
+          ? "Klarte ikke å lagre endringene. Prøv igjen."
+          : "Noe gikk galt. Prøv igjen.", "error");
       })
       .finally(function () {
         poiState.submitting = false;
-        poiSubmit.textContent = "Opprett punkt";
+        poiSubmit.textContent = editing ? "Lagre endringer" : "Opprett punkt";
         updatePoiSubmitState();
       });
   });
+
+  async function updatePoi() {
+    const objectId = poiState.editing.objectId;
+    const attributes = {};
+    attributes[POI_CONFIG.objectIdField] = objectId;
+    attributes[POI_CONFIG.titleField] = poiTitle.value.trim();
+    attributes[POI_CONFIG.descriptionField] = poiDescription.value.trim();
+
+    const body = new URLSearchParams();
+    body.set("f", "json");
+    body.set("features", JSON.stringify([{ attributes: attributes }]));
+
+    const resp = await fetch(POI_CONFIG.featureLayerUrl + "/updateFeatures", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: body.toString()
+    });
+    const json = await resp.json();
+    if (json.error) throw new Error("updateFeatures: " + (json.error.message || JSON.stringify(json.error)));
+
+    const result = (json.updateResults || [])[0];
+    if (!result || !result.success) throw new Error("updateFeatures feilet: " + JSON.stringify(result));
+
+    if (!poiState.imageBlob) return;
+
+    const form = new FormData();
+    form.set("f", "json");
+    form.set("attachment", poiState.imageBlob, "poi.jpg");
+
+    // Finnes det et bilde fra før, erstattes det. Ellers legges et nytt til.
+    const attachmentId = poiState.editing.attachmentId;
+    let url = POI_CONFIG.featureLayerUrl + "/" + objectId + "/addAttachment";
+    if (attachmentId) {
+      form.set("attachmentId", attachmentId);
+      url = POI_CONFIG.featureLayerUrl + "/" + objectId + "/updateAttachment";
+    }
+
+    const attachResp = await fetch(url, { method: "POST", body: form });
+    const attachJson = await attachResp.json();
+    const attachResult = attachJson.updateAttachmentResult || attachJson.addAttachmentResult;
+    if (attachJson.error || !(attachResult && attachResult.success)) {
+      throw new Error("Bildet ble ikke lagret: " + JSON.stringify(attachJson));
+    }
+  }
 
   async function submitPoi() {
     const attributes = {};
@@ -1999,14 +2095,20 @@
     }
   }
 
+  // Punktet som vises akkurat nå, slik Rediger-knappen vet hva den skal endre
+  let viewedPoi = null;
+
   function showPoi(graphic) {
     if (!layerRefs.poi) return;
-
     closeFeatureSheet();
     setInspectHighlight(graphic.geometry);
 
     const oidField = layerRefs.poi.objectIdField || "OBJECTID";
-    const objectId = graphic.attributes[oidField];
+    showPoiById(graphic.attributes[oidField]);
+  }
+
+  function showPoiById(objectId) {
+    if (!layerRefs.poi) return;
 
     // Attributtene hentes fra serveren — grafikken har bare feltene laget har lastet ned
     Promise.all([
@@ -2017,23 +2119,39 @@
       if (!feature) return;
 
       const attrs = feature.attributes;
-      poiViewTitle.textContent = (attrs[POI_CONFIG.titleField] || "Punkt").toString();
-      renderTextWithLinks(poiViewDescription, (attrs[POI_CONFIG.descriptionField] || "").toString());
+      const title = (attrs[POI_CONFIG.titleField] || "").toString();
+      const description = (attrs[POI_CONFIG.descriptionField] || "").toString();
+
+      poiViewTitle.textContent = title || "Punkt";
+      renderTextWithLinks(poiViewDescription, description);
 
       const attachments = results[1][objectId];
-      if (attachments && attachments.length) {
-        poiViewImage.src = attachments[0].url;
+      const attachment = attachments && attachments.length ? attachments[0] : null;
+      if (attachment) {
+        poiViewImage.src = attachment.url;
         poiViewImage.hidden = false;
       } else {
         poiViewImage.removeAttribute("src");
         poiViewImage.hidden = true;
       }
 
+      viewedPoi = {
+        objectId: objectId,
+        title: title,
+        description: description,
+        attachmentId: attachment ? attachment.id : null,
+        imageUrl: attachment ? attachment.url : null
+      };
+
       poiViewSheet.classList.add("open");
     }).catch(function (err) {
       console.warn("Kunne ikke hente punktet", err);
     });
   }
+
+  poiEditBtn.addEventListener("click", function () {
+    if (viewedPoi) openPoiEditForm(viewedPoi);
+  });
 
   // ---------------------------------------------------------------------
   // Visning av punkter fra Samferdselslaget
