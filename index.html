@@ -1179,6 +1179,15 @@
   // vises for hvert av dem. Tomme verdier hoppes over i visningen.
   const SAMFERDSEL_SUBLAYERS = [14, 1, 2, 3, 4, 5];
 
+  // Sublagene som beholdes fra Samferdsel. Alt annet i tjenesten slås av.
+  // Synligheten styres på kartbildets høyde i kilometer, ikke målestokk, som
+  // ville variert med skjermhøyden.
+  const SAMFERDSEL_ALWAYS = [21];                    // VegSenterlinje — hovedveinettet
+  const SAMFERDSEL_NEAR = [14, 0, 1, 2, 3, 4, 5, 22]; // parkering, holdeplasser, anleggsveg
+  const SAMFERDSEL_CLOSEST = [23, 24, 25];            // traktorveier og sperringer
+  const SAMFERDSEL_NEAR_KM = 15;
+  const SAMFERDSEL_CLOSEST_KM = 7;
+
   // identify svarer med feltenes alias, som for to av parkeringsfeltene er
   // skrevet annerledes enn feltnavnet. Derfor oppgis flere aktuelle nøkler.
   const PARKERING_FIELDS = [
@@ -2510,8 +2519,9 @@
       "esri/geometry/Polyline",
       "esri/geometry/geometryEngine",
       "esri/rest/identify",
-      "esri/rest/support/IdentifyParameters"
-    ], function (WebMap, MapView, Graphic, Point, GraphicsLayer, TileLayer, VectorTileLayer, Basemap, projection, Polyline, geometryEngine, identify, IdentifyParameters) {
+      "esri/rest/support/IdentifyParameters",
+      "esri/core/reactiveUtils"
+    ], function (WebMap, MapView, Graphic, Point, GraphicsLayer, TileLayer, VectorTileLayer, Basemap, projection, Polyline, geometryEngine, identify, IdentifyParameters, reactiveUtils) {
 
       const webmap = new WebMap({
         portalItem: { id: WEBMAP_ID }
@@ -2596,6 +2606,55 @@
         setPoiPicking(false);
         pickBanner.hidden = true;
       };
+
+      // ---------------- Sublag og synlighet i Samferdselslaget ----------------
+      function setSublayerVisible(sublayer, visible) {
+        if (sublayer && sublayer.visible !== visible) sublayer.visible = visible;
+      }
+
+      function updateSamferdselVisibility() {
+        const layer = layerRefs.samferdsel;
+        if (!layer || !view.extent) return;
+
+        // Kartets utstrekning er i meter (UTM33), altså høyden fra topp til bunn
+        const heightKm = view.extent.height / 1000;
+
+        SAMFERDSEL_NEAR.forEach(function (id) {
+          setSublayerVisible(layer.findSublayerById(id), heightKm <= SAMFERDSEL_NEAR_KM);
+        });
+        SAMFERDSEL_CLOSEST.forEach(function (id) {
+          setSublayerVisible(layer.findSublayerById(id), heightKm <= SAMFERDSEL_CLOSEST_KM);
+        });
+      }
+
+      function setupSamferdsel() {
+        const layer = layerRefs.samferdsel;
+        if (!layer || !layer.allSublayers) return;
+
+        const keep = SAMFERDSEL_ALWAYS.concat(SAMFERDSEL_NEAR, SAMFERDSEL_CLOSEST);
+        layer.allSublayers.forEach(function (sublayer) {
+          if (keep.indexOf(sublayer.id) === -1) {
+            setSublayerVisible(sublayer, false);
+            return;
+          }
+          if (SAMFERDSEL_ALWAYS.indexOf(sublayer.id) !== -1) {
+            setSublayerVisible(sublayer, true);
+            return;
+          }
+          // Målestokkgrensene fra webkartet ville ellers overstyrt km-reglene
+          sublayer.minScale = 0;
+          sublayer.maxScale = 0;
+        });
+
+        updateSamferdselVisibility();
+
+        // Oppdateres når kartet står stille, ikke under hver panorering, for å
+        // slippe en strøm av nye kartbilder mens brukeren beveger seg
+        reactiveUtils.watch(
+          function () { return view.stationary; },
+          function (stationary) { if (stationary) updateSamferdselVisibility(); }
+        );
+      }
 
       // ---------------- Oppslag i Samferdselslaget ----------------
       function identifySamferdsel(mapPoint) {
@@ -2735,6 +2794,8 @@
 
         // Standard-popup er av: alle klikkbare lag har egne flikker i appen
         view.popupEnabled = false;
+
+        setupSamferdsel();
 
         // Rasterkartet (papirkart) skal alltid starte avslått, uavhengig av lagret synlighet i web-kartet
         if (layerRefs.papirkart) layerRefs.papirkart.visible = document.getElementById("toggle-papirkart").checked;
