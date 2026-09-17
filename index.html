@@ -266,6 +266,65 @@
   }
   #info-sheet.open { transform: translateY(0); }
 
+  /* ---------------- Avstandsmåling ---------------- */
+  #measure-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 70vh;
+    background: var(--surface);
+    z-index: 40;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.2);
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    padding: 10px 18px calc(22px + env(safe-area-inset-bottom, 0px));
+  }
+  #measure-sheet.open { transform: translateY(0); }
+
+  .measure-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+  }
+  .measure-label { font-size: 0.92rem; color: var(--text-muted); }
+  .measure-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .measure-note {
+    margin: 8px 0 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .speed-control { display: flex; align-items: center; gap: 12px; }
+  .speed-btn {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .speed-btn:active { background: var(--bg); }
+  .speed-value {
+    flex: 1;
+    text-align: center;
+    font-size: 1.05rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
   /* ---------------- POI ---------------- */
   #pick-banner {
     position: fixed;
@@ -924,6 +983,45 @@
   </div>
 </div>
 
+<!-- Avstandsmåling. Ingen overlay: kartet må være klikkbart mens fliken er oppe -->
+<div id="measure-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <h2>Mål avstand</h2>
+    <button type="button" class="close-btn" id="measure-close">✕</button>
+  </div>
+
+  <p class="menu-hint" id="measure-hint">Trykk i kartet for å sette punkter. Dobbeltklikk for å avslutte linjen.</p>
+
+  <div class="card">
+    <div class="measure-row">
+      <span class="measure-label">Avstand</span>
+      <span class="measure-value" id="measure-distance">–</span>
+    </div>
+    <div class="measure-row">
+      <span class="measure-label">Kjøretid</span>
+      <span class="measure-value" id="measure-time">–</span>
+    </div>
+    <p class="measure-note" id="measure-note">Ved 5 knop</p>
+  </div>
+
+  <div class="card">
+    <span class="field-label">Båthastighet</span>
+    <div class="speed-control">
+      <button type="button" class="speed-btn" id="speed-down" aria-label="Senk hastighet">−</button>
+      <span class="speed-value" id="speed-value">5 knop</span>
+      <button type="button" class="speed-btn" id="speed-up" aria-label="Øk hastighet">+</button>
+    </div>
+  </div>
+
+  <button type="button" class="menu-btn-row" id="measure-restart">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path>
+    </svg>
+    <span>Ny måling</span>
+  </button>
+</div>
+
 <!-- Plasseringsbanner ved markering i kartet -->
 <div id="pick-banner" hidden>
   <span>Trykk i kartet for å plassere punktet</span>
@@ -1084,6 +1182,7 @@
   let startPoiMapPicking = function () {};
   let cancelPoiMapPicking = function () {};
   let stopMeasuring = function () {};
+  let restartMeasuring = function () {};
 
   // ---------------------------------------------------------------------
   // Side-meny åpne/lukke (uavhengig av kartet)
@@ -1464,6 +1563,68 @@
       throw new Error("addAttachment feilet: " + JSON.stringify(attachJson));
     }
   }
+
+  // ---------------------------------------------------------------------
+  // Avstandsmåling — visning av resultat og båthastighet
+  // ---------------------------------------------------------------------
+  const measureSheet = document.getElementById("measure-sheet");
+  const measureClose = document.getElementById("measure-close");
+  const measureRestart = document.getElementById("measure-restart");
+  const measureDistance = document.getElementById("measure-distance");
+  const measureTime = document.getElementById("measure-time");
+  const measureNote = document.getElementById("measure-note");
+  const speedValue = document.getElementById("speed-value");
+  const speedUp = document.getElementById("speed-up");
+  const speedDown = document.getElementById("speed-down");
+
+  const MIN_SPEED = 1;
+  const MAX_SPEED = 40;
+  let boatSpeedKnots = 5;
+  let measuredMeters = null;
+
+  // Kalles fra kartet hver gang målingen endrer seg
+  function setMeasuredLength(meters) {
+    measuredMeters = meters;
+    renderMeasurement();
+  }
+
+  function renderMeasurement() {
+    speedValue.textContent = boatSpeedKnots + " knop";
+    measureNote.textContent = "Kjøretid ved " + boatSpeedKnots + " knop";
+
+    if (!measuredMeters) {
+      measureDistance.textContent = "–";
+      measureTime.textContent = "–";
+      return;
+    }
+
+    measureDistance.textContent = formatDistance(measuredMeters);
+    // 1 knop = 1 nautisk mil i timen = 1852 m/t
+    const metersPerSecond = boatSpeedKnots * 1852 / 3600;
+    measureTime.textContent = formatDuration(measuredMeters / metersPerSecond);
+  }
+
+  function formatDistance(meters) {
+    if (meters < 1000) return Math.round(meters) + " m";
+    return (meters / 1000).toFixed(2).replace(".", ",") + " km";
+  }
+
+  function formatDuration(seconds) {
+    if (seconds < 60) return Math.round(seconds) + " sek";
+    const totalMinutes = Math.round(seconds / 60);
+    if (totalMinutes < 60) return totalMinutes + " min";
+    return Math.floor(totalMinutes / 60) + " t " + (totalMinutes % 60) + " min";
+  }
+
+  function changeSpeed(delta) {
+    boatSpeedKnots = Math.min(MAX_SPEED, Math.max(MIN_SPEED, boatSpeedKnots + delta));
+    renderMeasurement();
+  }
+
+  speedUp.addEventListener("click", function () { changeSpeed(1); });
+  speedDown.addEventListener("click", function () { changeSpeed(-1); });
+  measureClose.addEventListener("click", function () { stopMeasuring(); });
+  measureRestart.addEventListener("click", function () { restartMeasuring(); });
 
   // ---------------------------------------------------------------------
   // POI — opprette og vise punkter av interesse
@@ -2177,9 +2338,10 @@
       "esri/layers/TileLayer",
       "esri/layers/VectorTileLayer",
       "esri/Basemap",
-      "esri/widgets/DistanceMeasurement2D",
-      "esri/geometry/projection"
-    ], function (WebMap, MapView, Graphic, Point, GraphicsLayer, TileLayer, VectorTileLayer, Basemap, DistanceMeasurement2D, projection) {
+      "esri/widgets/DistanceMeasurement2D/DistanceMeasurement2DViewModel",
+      "esri/geometry/projection",
+      "esri/core/reactiveUtils"
+    ], function (WebMap, MapView, Graphic, Point, GraphicsLayer, TileLayer, VectorTileLayer, Basemap, DistanceMeasurement2DViewModel, projection, reactiveUtils) {
 
       const webmap = new WebMap({
         portalItem: { id: WEBMAP_ID }
@@ -2266,14 +2428,37 @@
       };
 
       // ---------------- Avstandsmåling ----------------
+      // Bare view-modellen brukes, ikke widgeten: tegningen og etikettene i
+      // kartet beholdes, mens resultatet vises i appens egen flik i stedet for
+      // Esris panel, som la seg oppå området man skulle klikke i.
       let measurement = null;
+      let measurementWatch = null;
+
+      function beginMeasurement() {
+        measurement.start().catch(function (err) {
+          console.warn("Kunne ikke starte målingen", err);
+        });
+      }
 
       stopMeasuring = function () {
         if (!measurement) return;
-        view.ui.remove(measurement);
+        if (measurementWatch) {
+          measurementWatch.remove();
+          measurementWatch = null;
+        }
+        measurement.clear();
         measurement.destroy();
         measurement = null;
+        setMeasuredLength(null);
+        measureSheet.classList.remove("open");
         measureBtn.classList.remove("active");
+      };
+
+      restartMeasuring = function () {
+        if (!measurement) return;
+        measurement.clear();
+        setMeasuredLength(null);
+        beginMeasurement();
       };
 
       measureBtn.addEventListener("click", function () {
@@ -2284,12 +2469,16 @@
         clearPhotoHighlight();
         cancelPoiMapPicking();
 
-        measurement = new DistanceMeasurement2D({ view: view, unit: "meters" });
-        view.ui.add(measurement, "top-right");
-        measurement.viewModel.start().catch(function (err) {
-          console.warn("Kunne ikke starte målingen", err);
-        });
+        measurement = new DistanceMeasurement2DViewModel({ view: view, unit: "meters" });
+        measurementWatch = reactiveUtils.watch(
+          function () { return measurement && measurement.measurement; },
+          function (result) { setMeasuredLength(result ? result.length : null); }
+        );
+
+        setMeasuredLength(null);
+        measureSheet.classList.add("open");
         measureBtn.classList.add("active");
+        beginMeasurement();
       });
 
       // Flytt kartets innebygde zoom-knapper vekk fra øverste venstre hjørne,
