@@ -372,7 +372,29 @@
     padding: 2px 4px;
   }
 
-  #poi-overlay, #poi-view-overlay {
+  .feature-kind {
+    margin: -4px 0 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .feature-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.93rem;
+  }
+  .feature-row:last-child { border-bottom: none; }
+  .feature-row .k { color: var(--text-muted); flex-shrink: 0; }
+  .feature-row .v { font-weight: 600; text-align: right; min-width: 0; }
+  .feature-empty { color: var(--text-muted); font-size: 0.92rem; }
+
+  #poi-overlay, #poi-view-overlay, #feature-overlay {
     position: fixed;
     inset: 0;
     background: rgba(0,0,0,0.35);
@@ -381,9 +403,9 @@
     pointer-events: none;
     transition: opacity 0.2s ease;
   }
-  #poi-overlay.open, #poi-view-overlay.open { opacity: 1; pointer-events: auto; }
+  #poi-overlay.open, #poi-view-overlay.open, #feature-overlay.open { opacity: 1; pointer-events: auto; }
 
-  #poi-sheet, #poi-view-sheet {
+  #poi-sheet, #poi-view-sheet, #feature-sheet {
     position: fixed;
     left: 0;
     right: 0;
@@ -398,7 +420,7 @@
     overflow-y: auto;
     padding: 10px 18px calc(26px + env(safe-area-inset-bottom, 0px));
   }
-  #poi-sheet.open, #poi-view-sheet.open { transform: translateY(0); }
+  #poi-sheet.open, #poi-view-sheet.open, #feature-sheet.open { transform: translateY(0); }
 
   .poi-position-choice { display: flex; gap: 8px; }
   .poi-choice {
@@ -1102,6 +1124,18 @@
   <p class="poi-view-description" id="poi-view-description"></p>
 </div>
 
+<!-- Visning av punkter fra Samferdselslaget -->
+<div id="feature-overlay"></div>
+<div id="feature-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <h2 id="feature-title">Punkt</h2>
+    <button type="button" class="close-btn" id="feature-close">✕</button>
+  </div>
+  <p class="feature-kind" id="feature-kind"></p>
+  <div class="card" id="feature-fields"></div>
+</div>
+
 <!-- Bla gjennom bilder (serier / datoer) -->
 <div id="browse-overlay"></div>
 <div id="browse-sheet">
@@ -1137,8 +1171,39 @@
     bilder: "BilderInnsjo",
     papirkart: "Nordre_Oyeren_tif",
     nve: "Innsjodatabase2",
-    poi: "POI_Innsjo"
+    poi: "POI_Innsjo",
+    samferdsel: "GeomapSamferdsel"
   };
+
+  // Sublag i Samferdselslaget som skal kunne klikkes på, og hvilke felt som
+  // vises for hvert av dem. Tomme verdier hoppes over i visningen.
+  const SAMFERDSEL_SUBLAYERS = [14, 1, 2, 3, 4, 5];
+
+  // identify svarer med feltenes alias, som for to av parkeringsfeltene er
+  // skrevet annerledes enn feltnavnet. Derfor oppgis flere aktuelle nøkler.
+  const PARKERING_FIELDS = [
+    [["type"], "Type"],
+    [["bruksområde"], "Bruksområde"],
+    [["innfartsparkering"], "Innfartsparkering"],
+    [["Antall_parkeringsplasser_små_kjt_", "antall_parkeringsplasser_små_k"], "Plasser, små kjøretøy"],
+    [["Antall_parkeringsplasser_store_kjt_", "antall_parkeringsplasser_store_"], "Plasser, store kjøretøy"],
+    [["antall_avgiftsfrie_plasser"], "Avgiftsfrie plasser"],
+    [["antall_avgiftsbelagte_plasser"], "Avgiftsbelagte plasser"],
+    [["plasser_reservert_handikappede"], "HC-plasser"],
+    [["antall_ladeplasser"], "Ladeplasser"],
+    [["avgift"], "Avgift"],
+    [["avgifts__restriksjonsinfo"], "Avgift og restriksjoner"],
+    [["adresse"], "Adresse"],
+    [["eier"], "Eier"],
+    [["parkeringstilbyder_navn"], "Parkeringstilbyder"]
+  ];
+
+  const HOLDEPLASS_FIELDS = [
+    [["stoptypename"], "Type"],
+    [["shortname"], "Kortnavn"],
+    [["zone_name"], "Sone"],
+    [["description"], "Beskrivelse"]
+  ];
 
   const POI_CONFIG = {
     featureLayerUrl: "https://services.arcgis.com/2JyTvMWQSnM2Vi8q/arcgis/rest/services/POI_Innsjo/FeatureServer/0",
@@ -1913,6 +1978,103 @@
   }
 
   // ---------------------------------------------------------------------
+  // Visning av punkter fra Samferdselslaget
+  // ---------------------------------------------------------------------
+  const featureOverlay = document.getElementById("feature-overlay");
+  const featureSheet = document.getElementById("feature-sheet");
+  const featureClose = document.getElementById("feature-close");
+  const featureTitle = document.getElementById("feature-title");
+  const featureKind = document.getElementById("feature-kind");
+  const featureFields = document.getElementById("feature-fields");
+
+  function closeFeatureSheet() {
+    featureOverlay.classList.remove("open");
+    featureSheet.classList.remove("open");
+  }
+  featureClose.addEventListener("click", closeFeatureSheet);
+  featureOverlay.addEventListener("click", closeFeatureSheet);
+
+  // result er ett treff fra identify: { layerId, layerName, feature: { attributes } }
+  function showSamferdselFeature(result) {
+    const attrs = (result.feature && result.feature.attributes) || result.attributes || {};
+    const isParkering = result.layerId === 14;
+    const fields = isParkering ? PARKERING_FIELDS : HOLDEPLASS_FIELDS;
+
+    const name = isParkering
+      ? readAttr(attrs, ["navn", "referanse"])
+      : readAttr(attrs, ["name"]);
+
+    featureTitle.textContent = isMeaningfulValue(name)
+      ? name.toString()
+      : (result.layerName || "Punkt");
+    featureKind.textContent = result.layerName || "";
+
+    featureFields.innerHTML = "";
+    let shown = 0;
+    fields.forEach(function (pair) {
+      const value = readAttr(attrs, pair[0]);
+      if (!isMeaningfulValue(value)) return;
+
+      const row = document.createElement("div");
+      row.className = "feature-row";
+
+      const key = document.createElement("span");
+      key.className = "k";
+      key.textContent = pair[1];
+
+      const val = document.createElement("span");
+      val.className = "v";
+      val.textContent = formatAttrValue(value);
+
+      row.appendChild(key);
+      row.appendChild(val);
+      featureFields.appendChild(row);
+      shown++;
+    });
+
+    if (!shown) {
+      const empty = document.createElement("div");
+      empty.className = "feature-empty";
+      empty.textContent = "Ingen flere opplysninger registrert.";
+      featureFields.appendChild(empty);
+    }
+
+    featureOverlay.classList.add("open");
+    featureSheet.classList.add("open");
+  }
+
+  function readAttr(attrs, names) {
+    for (let i = 0; i < names.length; i++) {
+      if (attrs[names[i]] !== undefined) return attrs[names[i]];
+    }
+    // Feltnavn og alias kan skille seg i kasus, så prøv ufølsomt oppslag også
+    const byLowerKey = {};
+    Object.keys(attrs).forEach(function (key) { byLowerKey[key.toLowerCase()] = attrs[key]; });
+    for (let i = 0; i < names.length; i++) {
+      const value = byLowerKey[names[i].toLowerCase()];
+      if (value !== undefined) return value;
+    }
+    return undefined;
+  }
+
+  // Kodeverdier som AVGRENSET_OMRADE leses lettere som vanlig tekst
+  function formatAttrValue(value) {
+    const text = value.toString().trim();
+    if (!/^[A-ZÆØÅ0-9_]{2,}$/.test(text) || /^\d+$/.test(text)) return text;
+    const words = text.replace(/_/g, " ").toLowerCase();
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  }
+
+  // Tjenesten bruker både null, tom streng og "Null"/"<Null>" for manglende verdi
+  function isMeaningfulValue(value) {
+    if (value === null || value === undefined) return false;
+    const text = value.toString().trim();
+    if (!text) return false;
+    const lower = text.toLowerCase();
+    return lower !== "null" && lower !== "<null>" && lower !== "ukjent";
+  }
+
+  // ---------------------------------------------------------------------
   // Bla gjennom bilder — velg en bildeserie eller en dato, og sveip gjennom
   // ---------------------------------------------------------------------
   const browseBtn = document.getElementById("browse-btn");
@@ -2346,8 +2508,10 @@
       "esri/Basemap",
       "esri/geometry/projection",
       "esri/geometry/Polyline",
-      "esri/geometry/geometryEngine"
-    ], function (WebMap, MapView, Graphic, Point, GraphicsLayer, TileLayer, VectorTileLayer, Basemap, projection, Polyline, geometryEngine) {
+      "esri/geometry/geometryEngine",
+      "esri/rest/identify",
+      "esri/rest/support/IdentifyParameters"
+    ], function (WebMap, MapView, Graphic, Point, GraphicsLayer, TileLayer, VectorTileLayer, Basemap, projection, Polyline, geometryEngine, identify, IdentifyParameters) {
 
       const webmap = new WebMap({
         portalItem: { id: WEBMAP_ID }
@@ -2432,6 +2596,30 @@
         setPoiPicking(false);
         pickBanner.hidden = true;
       };
+
+      // ---------------- Oppslag i Samferdselslaget ----------------
+      function identifySamferdsel(mapPoint) {
+        if (!layerRefs.samferdsel || !mapPoint || !layerRefs.samferdsel.visible) return;
+
+        const params = new IdentifyParameters({
+          geometry: mapPoint,
+          layerIds: SAMFERDSEL_SUBLAYERS,
+          layerOption: "visible",
+          tolerance: 8,
+          returnGeometry: false,
+          mapExtent: view.extent,
+          width: view.width,
+          height: view.height,
+          spatialReference: view.spatialReference
+        });
+
+        identify.identify(layerRefs.samferdsel.url, params).then(function (response) {
+          const result = (response.results || [])[0];
+          if (result) showSamferdselFeature(result);
+        }).catch(function (err) {
+          console.warn("Kunne ikke slå opp punktet i Samferdsel", err);
+        });
+      }
 
       // ---------------- Avstandsmåling ----------------
       // Tegnes selv, ikke med Esris måleverktøy: der festet gummistrikk-linjen
@@ -2552,10 +2740,8 @@
         if (layerRefs.nve) document.getElementById("toggle-nve").checked = layerRefs.nve.visible;
         if (layerRefs.poi) document.getElementById("toggle-poi").checked = layerRefs.poi.visible;
 
-        // Popup slås bare av for lagene appen håndterer selv. Øvrige lag beholder
-        // popup-en slik den er satt opp i webkartet i AGOL.
-        if (layerRefs.bilder) layerRefs.bilder.popupEnabled = false;
-        if (layerRefs.poi) layerRefs.poi.popupEnabled = false;
+        // Standard-popup er av: alle klikkbare lag har egne flikker i appen
+        view.popupEnabled = false;
 
         // Rasterkartet (papirkart) skal alltid starte avslått, uavhengig av lagret synlighet i web-kartet
         if (layerRefs.papirkart) layerRefs.papirkart.visible = document.getElementById("toggle-papirkart").checked;
@@ -2585,7 +2771,12 @@
 
           view.hitTest(event, { include: include }).then(function (response) {
             const hit = (response.results || [])[0];
-            if (!hit || !hit.graphic) return;
+            // Samferdsel er et kartbildelag, som hitTest ikke treffer — der må
+            // punktene slås opp med identify mot tjenesten i stedet
+            if (!hit || !hit.graphic) {
+              identifySamferdsel(event.mapPoint);
+              return;
+            }
 
             if (layerRefs.poi && hit.graphic.layer === layerRefs.poi) {
               showPoi(hit.graphic);
