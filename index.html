@@ -392,6 +392,12 @@
   .feature-row .k { color: var(--text-muted); flex-shrink: 0; }
   .feature-row .v { font-weight: 600; text-align: right; min-width: 0; }
   .feature-empty { color: var(--text-muted); font-size: 0.92rem; }
+  .feature-line {
+    margin: 0 0 8px;
+    font-size: 0.98rem;
+    line-height: 1.5;
+  }
+  .feature-line:last-child { margin-bottom: 0; }
 
   #poi-overlay {
     position: fixed;
@@ -1772,7 +1778,7 @@
     poiForm.reset();
     poiPhotoWrap.hidden = true;
     poiPhotoDropzone.hidden = false;
-    poiFormTitle.textContent = "Nytt punkt";
+    poiFormTitle.textContent = "Nytt interessepunkt";
     poiPositionCard.hidden = false;
     poiSubmit.textContent = "Opprett punkt";
     setPoiStatus("", "");
@@ -1793,7 +1799,7 @@
     };
 
     poiForm.reset();
-    poiFormTitle.textContent = "Rediger punkt";
+    poiFormTitle.textContent = "Rediger interessepunkt";
     poiPositionCard.hidden = true;
     poiSubmit.textContent = "Lagre endringer";
     setPoiStatus("", "");
@@ -2212,6 +2218,7 @@
       ? name.toString()
       : (result.layerName || "Punkt");
     featureKind.textContent = result.layerName || "";
+    featureKind.hidden = !featureKind.textContent;
 
     featureFields.innerHTML = "";
     let shown = 0;
@@ -2246,6 +2253,79 @@
     closePoiView();
     setInspectHighlight(result.feature && result.feature.geometry);
     featureSheet.classList.add("open");
+  }
+
+  // Led-feltet er et heltall (1-4). Navnet hentes fra lagets egen symbologi,
+  // slik at det følger med om etikettene endres i AGOL.
+  function ledName(value) {
+    const layer = layerRefs.led;
+    const infos = layer && layer.renderer && layer.renderer.uniqueValueInfos;
+    let label = null;
+
+    if (infos) {
+      infos.forEach(function (info) {
+        if (String(info.value) === String(value)) label = info.label;
+      });
+    }
+    if (!label) label = (value === null || value === undefined) ? "" : String(value);
+    if (!label) return "Led";
+
+    // "Kanoled" inneholder allerede ordet, så det skal ikke dobles
+    return /led$/i.test(label) ? label : label + " led";
+  }
+
+  function showLed(graphic) {
+    if (!layerRefs.led) return;
+
+    closePoiView();
+    setInspectHighlight(graphic.geometry);
+
+    const oidField = layerRefs.led.objectIdField || "OBJECTID";
+    const objectId = graphic.attributes[oidField];
+
+    // Hastighet og Info er nye felt som laget ikke nødvendigvis har lastet ned
+    layerRefs.led.queryFeatures({
+      objectIds: [objectId],
+      outFields: ["*"],
+      returnGeometry: false
+    }).then(function (result) {
+      const feature = result.features[0];
+      if (!feature) return;
+      const attrs = feature.attributes;
+
+      featureTitle.textContent = ledName(attrs["Led"]);
+      featureKind.textContent = "";
+      featureKind.hidden = true;
+
+      featureFields.innerHTML = "";
+
+      const hastighet = attrs["Hastighet"];
+      if (isMeaningfulValue(hastighet)) {
+        const text = hastighet.toString().trim();
+        const prefix = /^maks/i.test(text) ? "" : "maks ";
+        featureFields.appendChild(buildFeatureLine("Hastighet: " + prefix + text));
+      }
+
+      const info = attrs["Info"];
+      if (isMeaningfulValue(info)) {
+        featureFields.appendChild(buildFeatureLine(info.toString().trim()));
+      }
+
+      if (!featureFields.childNodes.length) {
+        featureFields.appendChild(buildFeatureLine("Ingen opplysninger registrert."));
+      }
+
+      featureSheet.classList.add("open");
+    }).catch(function (err) {
+      console.warn("Kunne ikke hente leden", err);
+    });
+  }
+
+  function buildFeatureLine(text) {
+    const line = document.createElement("p");
+    line.className = "feature-line";
+    line.textContent = text;
+    return line;
   }
 
   function readAttr(attrs, names) {
@@ -2741,16 +2821,18 @@
       setInspectHighlight = function (geometry) {
         inspectGraphicsLayer.removeAll();
         if (!geometry) return;
-        inspectGraphicsLayer.add(new Graphic({
-          geometry: geometry,
-          symbol: {
-            type: "simple-marker",
-            style: "circle",
-            color: [0, 0, 0, 0],
-            size: 34,
-            outline: { color: [0, 230, 118, 1], width: 3 }
-          }
-        }));
+
+        const symbol = geometry.type === "polyline"
+          ? { type: "simple-line", color: [0, 230, 118, 1], width: 6 }
+          : {
+              type: "simple-marker",
+              style: "circle",
+              color: [0, 0, 0, 0],
+              size: 34,
+              outline: { color: [0, 230, 118, 1], width: 3 }
+            };
+
+        inspectGraphicsLayer.add(new Graphic({ geometry: geometry, symbol: symbol }));
       };
 
       clearInspectHighlight = function () { inspectGraphicsLayer.removeAll(); };
@@ -3053,7 +3135,8 @@
             return;
           }
 
-          const include = [layerRefs.poi, layerRefs.bilder].filter(Boolean);
+          // Led ligger sist: punktene skal vinne over linjen når de overlapper
+          const include = [layerRefs.poi, layerRefs.bilder, layerRefs.led].filter(Boolean);
           if (!include.length) {
             identifySamferdsel(event.mapPoint);
             return;
@@ -3070,6 +3153,10 @@
 
             if (layerRefs.poi && hit.graphic.layer === layerRefs.poi) {
               showPoi(hit.graphic);
+              return;
+            }
+            if (layerRefs.led && hit.graphic.layer === layerRefs.led) {
+              showLed(hit.graphic);
               return;
             }
 
@@ -3171,6 +3258,8 @@
       document.getElementById("menu-zoom-btn").addEventListener("click", function () {
         clearPhotoHighlight();
         zoomToMyLocation();
+        // Den blå prikken slås på samtidig, så man ser hvor man er etter zoomen
+        startLocationTracking();
         closeMenu();
       });
 
@@ -3192,6 +3281,18 @@
         }));
       }
 
+      function startLocationTracking() {
+        if (watchId !== null || !("geolocation" in navigator)) return;
+        locateBtn.classList.add("active");
+        watchId = navigator.geolocation.watchPosition(function (pos) {
+          setLocationDot(pos.coords.longitude, pos.coords.latitude);
+        }, function (err) {
+          console.warn("Posisjonssporing feilet", err);
+          locateBtn.classList.remove("active");
+          watchId = null;
+        }, { enableHighAccuracy: true, maximumAge: 5000 });
+      }
+
       locateBtn.addEventListener("click", function () {
         clearPhotoHighlight();
         if (watchId !== null) {
@@ -3201,15 +3302,7 @@
           locateBtn.classList.remove("active");
           return;
         }
-        if (!("geolocation" in navigator)) return;
-        locateBtn.classList.add("active");
-        watchId = navigator.geolocation.watchPosition(function (pos) {
-          setLocationDot(pos.coords.longitude, pos.coords.latitude);
-        }, function (err) {
-          console.warn("Posisjonssporing feilet", err);
-          locateBtn.classList.remove("active");
-          watchId = null;
-        }, { enableHighAccuracy: true, maximumAge: 5000 });
+        startLocationTracking();
       });
     });
   } else {
