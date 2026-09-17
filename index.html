@@ -455,6 +455,11 @@
     white-space: pre-wrap;
   }
   .poi-view-description:empty { display: none; }
+  .poi-view-description a {
+    color: var(--accent);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
 
   #browse-overlay {
     position: fixed;
@@ -1953,6 +1958,47 @@
     clearInspectHighlight();
   });
 
+  // Skriver teksten som tekstnoder og lenker, aldri som innerHTML —
+  // beskrivelsene er fritekst fra publikum. Bare http, https og www-adresser
+  // blir lenker, så f.eks. javascript:-adresser kan ikke bli klikkbare.
+  function renderTextWithLinks(container, text) {
+    container.textContent = "";
+    if (!text) return;
+
+    const pattern = /(?:https?:\/\/|www\.)[^\s]+/gi;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = pattern.exec(text)) !== null) {
+      let url = match[0];
+
+      // Skilletegn til slutt hører som regel til setningen, ikke adressen
+      const trailing = url.match(/[.,;:!?)\]}'"]+$/);
+      if (trailing) {
+        url = url.slice(0, url.length - trailing[0].length);
+        pattern.lastIndex -= trailing[0].length;
+      }
+      if (!url) continue;
+
+      if (match.index > lastIndex) {
+        container.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+      }
+
+      const link = document.createElement("a");
+      link.href = /^www\./i.test(url) ? "https://" + url : url;
+      link.textContent = url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      container.appendChild(link);
+
+      lastIndex = match.index + url.length;
+    }
+
+    if (lastIndex < text.length) {
+      container.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+  }
+
   function showPoi(graphic) {
     if (!layerRefs.poi) return;
 
@@ -1972,7 +2018,7 @@
 
       const attrs = feature.attributes;
       poiViewTitle.textContent = (attrs[POI_CONFIG.titleField] || "Punkt").toString();
-      poiViewDescription.textContent = (attrs[POI_CONFIG.descriptionField] || "").toString();
+      renderTextWithLinks(poiViewDescription, (attrs[POI_CONFIG.descriptionField] || "").toString());
 
       const attachments = results[1][objectId];
       if (attachments && attachments.length) {
