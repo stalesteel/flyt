@@ -108,7 +108,7 @@
     transform: translateX(104%);
     transition: transform 0.22s ease;
     overflow-y: auto;
-    padding: 18px 18px 30px;
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 18px calc(20px + env(safe-area-inset-bottom, 0px));
   }
   #side-menu.open { transform: translateX(0); }
 
@@ -117,14 +117,10 @@
     #side-menu { background: rgba(255,255,255,0.97); }
   }
 
-  #side-menu h1 {
-    font-size: 1.15rem;
-    margin: 4px 0 20px;
-  }
-
   .menu-section {
-    margin-bottom: 22px;
+    margin-bottom: 16px;
   }
+  .menu-section:last-child { margin-bottom: 0; }
 
   .menu-section .section-label {
     font-size: 0.78rem;
@@ -132,15 +128,17 @@
     letter-spacing: 0.03em;
     text-transform: uppercase;
     color: var(--text-muted);
-    margin-bottom: 10px;
+    margin-bottom: 6px;
   }
 
   .layer-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 0;
+    gap: 10px;
+    padding: 7px 0;
     font-size: 0.94rem;
+    line-height: 1.25;
     border-bottom: 1px solid var(--border);
   }
   .layer-row:last-child { border-bottom: none; }
@@ -179,7 +177,7 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 9px 0;
+    padding: 6px 0;
     font-size: 0.94rem;
     cursor: pointer;
   }
@@ -190,7 +188,8 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 11px 12px;
+    margin-top: 10px;
+    padding: 10px 12px;
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--surface);
@@ -460,6 +459,22 @@
     font-weight: 600;
     overflow-wrap: anywhere;
   }
+
+  .poi-view-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
+  .poi-edit-link {
+    background: none;
+    border: none;
+    padding: 6px 2px;
+    font-family: inherit;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .poi-edit-link:active { color: var(--text); }
 
   #browse-overlay {
     position: fixed;
@@ -887,14 +902,27 @@
 <!-- Side menu -->
 <div id="menu-overlay"></div>
 <nav id="side-menu">
-  <h1>Flyt</h1>
 
   <div class="menu-section">
-    <div class="section-label">Lag</div>
+    <div class="section-label">Kartlag</div>
     <div class="layer-row">
       <span>Led</span>
       <label class="switch">
         <input type="checkbox" id="toggle-led" checked>
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="layer-row">
+      <span>Dybdekurver</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-nve" checked>
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="layer-row">
+      <span>Samferdsel</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-samferdsel" checked>
         <span class="track"></span>
       </label>
     </div>
@@ -913,26 +941,19 @@
       </label>
     </div>
     <div class="layer-row">
-      <span>Dybdekurver</span>
-      <label class="switch">
-        <input type="checkbox" id="toggle-nve" checked>
-        <span class="track"></span>
-      </label>
-    </div>
-    <div class="layer-row">
-      <span>POI</span>
+      <span>Interessepunkt</span>
       <label class="switch">
         <input type="checkbox" id="toggle-poi" checked>
         <span class="track"></span>
       </label>
     </div>
 
-    <button type="button" class="menu-btn-row" id="new-poi-btn" style="margin-top: 14px;">
+    <button type="button" class="menu-btn-row" id="new-poi-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M21 10c0 6-9 13-9 13s-9-7-9-13a9 9 0 0 1 18 0z"></path>
         <path d="M12 7v6M9 10h6"></path>
       </svg>
-      <span>Ny POI</span>
+      <span>Nytt interessepunkt</span>
     </button>
   </div>
 
@@ -942,12 +963,10 @@
   </div>
 
   <div class="menu-section">
-    <div class="section-label">Posisjon</div>
     <button type="button" class="menu-btn-row" id="menu-zoom-btn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
       <span>Zoom til min posisjon</span>
     </button>
-    <p class="menu-hint">Nettleseren vil be om tillatelse til å dele posisjonen din første gang du bruker dette.</p>
   </div>
 </nav>
 
@@ -1122,11 +1141,13 @@
   <div class="sheet-handle"></div>
   <div class="sheet-header">
     <h2 id="poi-view-title">Punkt</h2>
-    <button type="button" class="sheet-action" id="poi-edit">Rediger</button>
     <button type="button" class="close-btn" id="poi-view-close">✕</button>
   </div>
   <img class="poi-view-image" id="poi-view-image" alt="" hidden>
   <p class="poi-view-description" id="poi-view-description"></p>
+  <div class="poi-view-actions">
+    <button type="button" class="poi-edit-link" id="poi-edit">Rediger</button>
+  </div>
 </div>
 
 <!-- Visning av punkter fra Samferdselslaget.
@@ -2993,6 +3014,7 @@
         if (layerRefs.bilder) document.getElementById("toggle-bilder").checked = layerRefs.bilder.visible;
         if (layerRefs.nve) document.getElementById("toggle-nve").checked = layerRefs.nve.visible;
         if (layerRefs.poi) document.getElementById("toggle-poi").checked = layerRefs.poi.visible;
+        if (layerRefs.samferdsel) document.getElementById("toggle-samferdsel").checked = layerRefs.samferdsel.visible;
 
         // Standard-popup er av: alle klikkbare lag har egne flikker i appen
         view.popupEnabled = false;
@@ -3092,6 +3114,10 @@
       document.getElementById("toggle-poi").addEventListener("change", function (e) {
         clearPhotoHighlight();
         if (layerRefs.poi) layerRefs.poi.visible = e.target.checked;
+      });
+      document.getElementById("toggle-samferdsel").addEventListener("change", function (e) {
+        clearPhotoHighlight();
+        if (layerRefs.samferdsel) layerRefs.samferdsel.visible = e.target.checked;
       });
 
       // ---------------- Basemap-veksling ----------------
