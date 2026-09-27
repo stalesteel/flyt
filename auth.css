@@ -1,0 +1,81 @@
+/* Innloggingsskjerm — holdt i samme tone som resten av Flyt */
+html[data-locked] body > *:not(.flyt-login) { display: none !important; }
+html[data-locked], html[data-locked] body { overflow: hidden; }
+
+.flyt-login {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #f7f7f5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #1c1c1c;
+  overflow-y: auto;
+}
+
+.flyt-login-card {
+  width: 100%;
+  max-width: 340px;
+  background: #fff;
+  border: 1px solid #e2e2e0;
+  border-radius: 16px;
+  padding: 26px 22px 24px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.07);
+}
+
+.flyt-login-card h1 {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
+  letter-spacing: -0.01em;
+}
+
+.flyt-login-card > p {
+  margin: 0 0 22px;
+  font-size: 0.92rem;
+  color: #6b6b6b;
+}
+
+.flyt-login-card label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.flyt-login-card input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e2e2e0;
+  border-radius: 10px;
+  padding: 13px 12px;
+  margin-bottom: 16px;
+  font-family: inherit;
+  font-size: 1rem;
+  background: #fff;
+  color: #1c1c1c;
+}
+.flyt-login-card input:focus { outline: none; border-color: #2f6f4f; }
+
+.flyt-login-card button {
+  width: 100%;
+  padding: 15px;
+  border: none;
+  border-radius: 12px;
+  background: #2f6f4f;
+  color: #fff;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.flyt-login-card button:active { background: #255a40; }
+
+.flyt-login-error {
+  margin: 14px 0 0;
+  font-size: 0.88rem;
+  text-align: center;
+  color: #b3261e;
+}
