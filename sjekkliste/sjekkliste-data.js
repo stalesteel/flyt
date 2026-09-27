@@ -7,6 +7,9 @@
 
   Én rad per sjekkpunkt. Listen den hører til identifiseres med ListeId, og
   navnet ligger på hver rad. Bildet lagres som attachment på raden.
+
+  Laget er et punktlag, ikke en tabell: AGOL tilbyr ikke attachments på hosted
+  tables. Geometrien brukes ikke til noe — alle radene får samme plassering.
 */
 (function (global) {
   "use strict";
@@ -122,6 +125,10 @@
 
   // ---------------- Skriving ----------------
 
+  // Alle radene legges på samme sted midt i Øyeren. Plasseringen betyr ingenting;
+  // laget er et punktlag bare fordi attachments krever det.
+  const PLASSERING = { x: 11.15, y: 59.85, spatialReference: { wkid: 4326 } };
+
   function nyttPunkt(punkt) {
     const attributter = {};
     attributter[F.listeId] = punkt.listeId;
@@ -130,7 +137,8 @@
     attributter[F.beskrivelse] = punkt.beskrivelse || "";
     attributter[F.rekkefolge] = punkt.rekkefolge || 0;
 
-    return postSkjema("addFeatures", { features: JSON.stringify([{ attributes: attributter }]) })
+    const ny = { geometry: PLASSERING, attributes: attributter };
+    return postSkjema("addFeatures", { features: JSON.stringify([ny]) })
       .then(function (json) { return sjekkResultater(json, "addResults")[0].objectId; });
   }
 
