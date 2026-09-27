@@ -38,6 +38,19 @@
     margin: 0 auto;
     padding: calc(28px + env(safe-area-inset-top, 0px)) 20px calc(28px + env(safe-area-inset-bottom, 0px));
   }
+  .til-kart {
+    display: inline-block;
+    margin-bottom: 14px;
+    padding: 8px 14px 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    text-decoration: none;
+  }
+
   #oversikt h1 { font-size: 1.5rem; margin: 0 0 4px; }
   #oversikt .intro { margin: 0 0 24px; color: var(--text-muted); font-size: 0.95rem; }
 
@@ -266,6 +279,7 @@
 <body>
 
 <div id="oversikt" hidden>
+  <a class="til-kart" href="../">‹ Kartet</a>
   <h1>Sjekklister</h1>
   <p class="intro">Velg listen du skal gå gjennom.</p>
   <div id="liste-knapper"></div>
@@ -305,11 +319,32 @@ FlytAuth.krevAdgang(function () {
   let avkrysset = {};
   let wakeLock = null;
 
+  // Kom brukeren rett hit fra kartmenyen, skal tilbakeknappen føre dit igjen
+  // og ikke innom listeoversikten
+  const dyplenke = lesListeIdFraUrl();
+  let tilbakeTilKart = false;
+
+  function lesListeIdFraUrl() {
+    const treff = /(?:^|[#&])liste=([^&]+)/.exec(location.hash || "");
+    return treff ? decodeURIComponent(treff[1]) : null;
+  }
+
   // Avkrysninger lagres bevisst ikke: listen skal starte blank hver gang
   Sjekkliste.hentLister()
     .then(function (json) {
       data = json;
-      visOversikt();
+
+      const onsket = dyplenke && (data.lister || []).filter(function (l) {
+        return l.id === dyplenke;
+      })[0];
+
+      // Finnes ikke listen lenger, havner man trygt i oversikten i stedet
+      if (onsket) {
+        tilbakeTilKart = true;
+        apneListe(onsket);
+      } else {
+        visOversikt();
+      }
     })
     .catch(function (err) {
       console.error(err);
@@ -319,6 +354,8 @@ FlytAuth.krevAdgang(function () {
   function visOversikt() {
     stoppWakeLock();
     aktivListe = null;
+    tilbakeTilKart = false;
+    if (location.hash) history.replaceState(null, "", location.pathname);
     listeKnapper.innerHTML = "";
 
     if (!(data.lister || []).length) {
@@ -503,12 +540,18 @@ FlytAuth.krevAdgang(function () {
     const avslutt = document.createElement("button");
     avslutt.type = "button";
     avslutt.className = "avslutt-knapp";
-    avslutt.textContent = "Tilbake til oversikten";
-    avslutt.addEventListener("click", visOversikt);
+    avslutt.textContent = tilbakeTilKart ? "Tilbake til kartet" : "Tilbake til oversikten";
+    avslutt.addEventListener("click", function () {
+      if (tilbakeTilKart) location.href = "../";
+      else visOversikt();
+    });
     side.appendChild(avslutt);
   }
 
-  tilbake.addEventListener("click", visOversikt);
+  tilbake.addEventListener("click", function () {
+    if (tilbakeTilKart) location.href = "../";
+    else visOversikt();
+  });
 
   // ---------------- Hold skjermen våken ----------------
   function startWakeLock() {
