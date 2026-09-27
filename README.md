@@ -22,8 +22,9 @@ Innloggingen huskes i 90 dager i nettleseren.
 
 Dette er en **dørmatte, ikke en lås**. GitHub Pages serverer bare statiske filer, så det
 finnes ingen server å gjøre sjekken på — alt skjer i nettleseren. I tillegg er repoet
-offentlig, så hvem som helst kan lese `index.html`, `sjekkliste/data.json` og bildene
-direkte på GitHub uansett hva innloggingssiden sier.
+offentlig, så hvem som helst kan lese `index.html` og resten av kildekoden direkte på
+GitHub uansett hva innloggingssiden sier. Selve sjekklistene ligger i ArcGIS, men den
+tjenesten er delt offentlig og kan leses av den som kjenner URL-en.
 
 Sperren holder tilfeldige besøkende ute. Den stopper ingen som åpner utviklerverktøy
 eller finner repoet. Legg derfor **aldri noe sensitivt** i disse filene.
