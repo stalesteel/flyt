@@ -1,0 +1,88 @@
+{
+  "lister": [
+    {
+      "id": "ankomst",
+      "navn": "Ankomst båt – før tur",
+      "punkter": [
+        {
+          "id": "fortoyning",
+          "tittel": "Fortøyninger og fendere",
+          "beskrivelse": "Sjekk at tauverk er helt og riktig festet, og at fenderne henger der de skal.",
+          "bilde": "bilder/plassholder-1.svg"
+        },
+        {
+          "id": "hovedstrom",
+          "tittel": "Slå på hovedstrøm",
+          "beskrivelse": "Vri hovedbryteren til på, og se at instrumentpanelet våkner.",
+          "bilde": "bilder/plassholder-2.svg"
+        },
+        {
+          "id": "drivstoff",
+          "tittel": "Sjekk drivstoff",
+          "beskrivelse": "Les av måleren. Har du nok til turen, og til å komme hjem igjen?",
+          "bilde": "bilder/plassholder-3.svg"
+        },
+        {
+          "id": "flytevester",
+          "tittel": "Flytevester om bord",
+          "beskrivelse": "Én vest i riktig størrelse til hver om bord. Sjekk at de er hele.",
+          "bilde": "bilder/plassholder-4.svg"
+        },
+        {
+          "id": "lensepumpe",
+          "tittel": "Lensepumpe og kjølvann",
+          "beskrivelse": "Se at lensepumpen virker, og at det kommer kjølevann ut når motoren går.",
+          "bilde": "bilder/plassholder-5.svg"
+        },
+        {
+          "id": "kalesje-av",
+          "tittel": "Løsne kalesjen",
+          "beskrivelse": "Løsne og legg sammen kalesjen, og sikre den så den ikke blåser.",
+          "bilde": "bilder/plassholder-6.svg"
+        }
+      ]
+    },
+    {
+      "id": "forlate",
+      "navn": "Forlate båten",
+      "punkter": [
+        {
+          "id": "motor-av",
+          "tittel": "Slå av motor og hovedstrøm",
+          "beskrivelse": "Stopp motoren, og vri hovedbryteren av før du går fra båten.",
+          "bilde": "bilder/plassholder-1.svg"
+        },
+        {
+          "id": "drivstoffkran",
+          "tittel": "Lukk drivstoffkranen",
+          "beskrivelse": "Steng kranen slik at det ikke kan lekke drivstoff mens båten ligger.",
+          "bilde": "bilder/plassholder-2.svg"
+        },
+        {
+          "id": "fortoy",
+          "tittel": "Fortøy og sett fendere",
+          "beskrivelse": "Fortøy for det været som er meldt, og heng fenderne mellom båt og brygge.",
+          "bilde": "bilder/plassholder-3.svg"
+        },
+        {
+          "id": "soppel",
+          "tittel": "Ta med søppel og verdisaker",
+          "beskrivelse": "Tøm båten for søppel, mat og alt som ikke bør ligge igjen.",
+          "bilde": "bilder/plassholder-4.svg"
+        },
+        {
+          "id": "kalesje-pa",
+          "tittel": "Sett på kalesjen",
+          "beskrivelse": "Dra kalesjen på plass og fest den godt hele veien rundt.",
+          "bilde": "bilder/plassholder-5.svg"
+        },
+        {
+          "id": "las",
+          "tittel": "Lås båten",
+          "beskrivelse": "Lås luker og dør, og ta nøkkelen med deg.",
+          "bilde": "bilder/plassholder-6.svg"
+        }
+      ]
+    }
+  ]
+}

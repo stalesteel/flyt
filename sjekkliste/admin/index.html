@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Rediger sjekklister – Flyt</title>
+<link rel="stylesheet" href="../../auth.css">
+<script src="../../auth.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --text: #1c1c1c;
+    --text-muted: #6b6b6b;
+    --border: #e2e2e0;
+    --accent: #2f6f4f;
+    --error: #b3261e;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: calc(20px + env(safe-area-inset-top, 0px)) 16px calc(40px + env(safe-area-inset-bottom, 0px));
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  [hidden] { display: none !important; }
+
+  main { max-width: 720px; margin: 0 auto; }
+
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  .intro { margin: 0 0 20px; color: var(--text-muted); font-size: 0.92rem; line-height: 1.5; }
+
+  .ulagret {
+    margin: 0 0 18px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border-left: 4px solid #c9a227;
+    background: #fdf6e3;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .verktoylinje {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 0.92rem;
+    cursor: pointer;
+  }
+
+  .knapp {
+    padding: 11px 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    font-weight: 600;
+    color: var(--text);
+  }
+  .knapp.primar { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .knapp.fare { color: var(--error); }
+  .knapp:active { opacity: 0.75; }
+
+  .liste-kort {
+    margin-bottom: 20px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+  }
+
+  .liste-topp {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .liste-topp input {
+    flex: 1;
+    min-width: 160px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .punkt {
+    padding: 14px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg);
+  }
+  .punkt-topp {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .punkt-nr {
+    flex-shrink: 0;
+    width: 26px; height: 26px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    background: var(--border);
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .punkt-topp .flex { flex: 1; }
+  .ikonknapp {
+    width: 38px; height: 38px;
+    flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface);
+    font-size: 1.05rem;
+    line-height: 1;
+  }
+  .ikonknapp:disabled { opacity: 0.35; cursor: default; }
+
+  .punkt label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+  .punkt input[type="text"], .punkt textarea {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    background: var(--surface);
+    color: var(--text);
+  }
+  .punkt textarea { min-height: 64px; resize: vertical; }
+
+  .bilde-rad { display: flex; gap: 12px; align-items: flex-start; }
+  .bilde-rad .felt { flex: 1; min-width: 0; }
+  .forhandsvis {
+    width: 78px;
+    height: 104px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    object-fit: cover;
+    object-position: center top;
+    background: linear-gradient(160deg, #3a4048, #23262b);
+  }
+
+  .fullskjerm-knapp { margin-top: 2px; }
+
+  /* Forhåndsvisning i fullskjerm, som i selve sjekklisten */
+  #forhandsvisning {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: #23262b;
+  }
+  #forhandsvisning img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    object-position: center top;
+    display: block;
+  }
+  #forhandsvisning .baand {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 90px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.75) 45%, rgba(0,0,0,0) 100%);
+    color: #fff;
+  }
+  #forhandsvisning h2 { margin: 0 0 6px; font-size: 1.45rem; }
+  #forhandsvisning p { margin: 0; font-size: 1.05rem; line-height: 1.45; color: rgba(255,255,255,0.88); }
+  #forhandsvisning .lukk {
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    right: 14px;
+    width: 44px; height: 44px;
+    border: none; border-radius: 50%;
+    background: rgba(0,0,0,0.5);
+    color: #fff; font-size: 1.3rem;
+  }
+</style>
+</head>
+<body>
+
+<main>
+  <h1>Rediger sjekklister</h1>
+  <p class="intro">
+    Endringer lagres i denne nettleseren mens du jobber. For at de skal gjelde på
+    ordentlig må du laste ned <code>data.json</code> og legge den inn i prosjektet.
+    Se README for framgangsmåten.
+  </p>
+
+  <p class="ulagret" id="ulagret" hidden>
+    Du har endringer som ennå ikke er lagt inn i prosjektet. Trykk «Last ned data.json».
+  </p>
+
+  <div class="verktoylinje">
+    <button type="button" class="knapp primar" id="last-ned">Last ned data.json</button>
+    <button type="button" class="knapp" id="ny-liste">Ny sjekkliste</button>
+    <button type="button" class="knapp fare" id="forkast">Forkast endringer</button>
+  </div>
+
+  <div id="lister"></div>
+</main>
+
+<div id="forhandsvisning" hidden>
+  <img id="fv-bilde" alt="">
+  <div class="baand">
+    <h2 id="fv-tittel"></h2>
+    <p id="fv-tekst"></p>
+  </div>
+  <button type="button" class="lukk" id="fv-lukk">✕</button>
+</div>
+
+<script>
+FlytAuth.krevAdgang(function () {
+  "use strict";
+
+  const LAGER_NOKKEL = "flyt-sjekkliste-utkast";
+
+  const listerEl = document.getElementById("lister");
+  const ulagret = document.getElementById("ulagret");
+  const forhandsvisning = document.getElementById("forhandsvisning");
+  const fvBilde = document.getElementById("fv-bilde");
+  const fvTittel = document.getElementById("fv-tittel");
+  const fvTekst = document.getElementById("fv-tekst");
+
+  let data = { lister: [] };
+  let endret = false;
+
+  // Utkastet i nettleseren vinner, så man ikke mister arbeid ved en refresh
+  const utkast = lesUtkast();
+  if (utkast) {
+    data = utkast;
+    endret = true;
+    tegn();
+  } else {
+    hentFraFil();
+  }
+
+  function hentFraFil() {
+    fetch("../data.json", { cache: "no-store" })
+      .then(function (r) { return r.json(); })
+      .then(function (json) {
+        data = json && json.lister ? json : { lister: [] };
+        tegn();
+      })
+      .catch(function (err) {
+        console.error(err);
+        listerEl.textContent = "Klarte ikke å laste data.json.";
+      });
+  }
+
+  function lesUtkast() {
+    try {
+      const raw = localStorage.getItem(LAGER_NOKKEL);
+      return raw ? JSON.parse(raw) : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function lagreUtkast() {
+    endret = true;
+    ulagret.hidden = false;
+    try {
+      localStorage.setItem(LAGER_NOKKEL, JSON.stringify(data));
+    } catch (err) {
+      // Full eller blokkert lagring: endringene lever bare i denne økten
+    }
+  }
+
+  function nyId(prefiks) {
+    return prefiks + "-" + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
+  }
+
+  // ---------------- Tegning ----------------
+  function tegn() {
+    ulagret.hidden = !endret;
+    listerEl.innerHTML = "";
+
+    if (!data.lister.length) {
+      const tom = document.createElement("p");
+      tom.className = "intro";
+      tom.textContent = "Ingen sjekklister ennå. Trykk «Ny sjekkliste» for å lage en.";
+      listerEl.appendChild(tom);
+      return;
+    }
+
+    data.lister.forEach(function (liste, listeIndeks) {
+      listerEl.appendChild(tegnListe(liste, listeIndeks));
+    });
+  }
+
+  function tegnListe(liste, listeIndeks) {
+    const kort = document.createElement("div");
+    kort.className = "liste-kort";
+
+    const topp = document.createElement("div");
+    topp.className = "liste-topp";
+
+    const navn = document.createElement("input");
+    navn.type = "text";
+    navn.value = liste.navn || "";
+    navn.setAttribute("aria-label", "Navn på sjekkliste");
+    navn.addEventListener("input", function () {
+      liste.navn = navn.value;
+      lagreUtkast();
+    });
+    topp.appendChild(navn);
+
+    const slett = document.createElement("button");
+    slett.type = "button";
+    slett.className = "knapp fare";
+    slett.textContent = "Slett liste";
+    slett.addEventListener("click", function () {
+      if (!confirm("Slette sjekklisten «" + (liste.navn || "uten navn") + "»?")) return;
+      data.lister.splice(listeIndeks, 1);
+      lagreUtkast();
+      tegn();
+    });
+    topp.appendChild(slett);
+
+    kort.appendChild(topp);
+
+    (liste.punkter || []).forEach(function (punkt, i) {
+      kort.appendChild(tegnPunkt(liste, punkt, i));
+    });
+
+    const nyttPunkt = document.createElement("button");
+    nyttPunkt.type = "button";
+    nyttPunkt.className = "knapp";
+    nyttPunkt.textContent = "Legg til punkt";
+    nyttPunkt.addEventListener("click", function () {
+      liste.punkter = liste.punkter || [];
+      liste.punkter.push({ id: nyId("punkt"), tittel: "Nytt punkt", beskrivelse: "", bilde: "" });
+      lagreUtkast();
+      tegn();
+    });
+    kort.appendChild(nyttPunkt);
+
+    return kort;
+  }
+
+  function tegnPunkt(liste, punkt, i) {
+    const rad = document.createElement("div");
+    rad.className = "punkt";
+
+    const topp = document.createElement("div");
+    topp.className = "punkt-topp";
+
+    const nr = document.createElement("span");
+    nr.className = "punkt-nr";
+    nr.textContent = String(i + 1);
+    topp.appendChild(nr);
+
+    const flex = document.createElement("span");
+    flex.className = "flex";
+    topp.appendChild(flex);
+
+    // Opp og ned i stedet for dra og slipp: langt mer treffsikkert på mobil
+    const opp = document.createElement("button");
+    opp.type = "button";
+    opp.className = "ikonknapp";
+    opp.textContent = "↑";
+    opp.setAttribute("aria-label", "Flytt opp");
+    opp.disabled = i === 0;
+    opp.addEventListener("click", function () { flytt(liste, i, -1); });
+    topp.appendChild(opp);
+
+    const ned = document.createElement("button");
+    ned.type = "button";
+    ned.className = "ikonknapp";
+    ned.textContent = "↓";
+    ned.setAttribute("aria-label", "Flytt ned");
+    ned.disabled = i === liste.punkter.length - 1;
+    ned.addEventListener("click", function () { flytt(liste, i, 1); });
+    topp.appendChild(ned);
+
+    const slett = document.createElement("button");
+    slett.type = "button";
+    slett.className = "ikonknapp";
+    slett.textContent = "✕";
+    slett.setAttribute("aria-label", "Slett punkt");
+    slett.addEventListener("click", function () {
+      if (!confirm("Slette punktet «" + (punkt.tittel || "uten tittel") + "»?")) return;
+      liste.punkter.splice(i, 1);
+      lagreUtkast();
+      tegn();
+    });
+    topp.appendChild(slett);
+
+    rad.appendChild(topp);
+
+    rad.appendChild(lagFelt("Tittel", "text", punkt.tittel || "", function (v) {
+      punkt.tittel = v;
+      lagreUtkast();
+    }));
+
+    rad.appendChild(lagFelt("Beskrivelse", "textarea", punkt.beskrivelse || "", function (v) {
+      punkt.beskrivelse = v;
+      lagreUtkast();
+    }));
+
+    rad.appendChild(tegnBildevelger(punkt));
+    return rad;
+  }
+
+  function lagFelt(etikett, type, verdi, onChange) {
+    const wrap = document.createElement("div");
+
+    const label = document.createElement("label");
+    label.textContent = etikett;
+    wrap.appendChild(label);
+
+    const felt = document.createElement(type === "textarea" ? "textarea" : "input");
+    if (type !== "textarea") felt.type = "text";
+    felt.value = verdi;
+    felt.addEventListener("input", function () { onChange(felt.value); });
+    wrap.appendChild(felt);
+
+    return wrap;
+  }
+
+  function tegnBildevelger(punkt) {
+    const rad = document.createElement("div");
+    rad.className = "bilde-rad";
+
+    const felt = document.createElement("div");
+    felt.className = "felt";
+
+    const label = document.createElement("label");
+    label.textContent = "Bilde (filnavn i bilder-mappen)";
+    felt.appendChild(label);
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = punkt.bilde || "";
+    input.placeholder = "bilder/fortoyning.jpg";
+    felt.appendChild(input);
+
+    const velg = document.createElement("button");
+    velg.type = "button";
+    velg.className = "knapp";
+    velg.textContent = "Velg bildefil";
+
+    const fullskjerm = document.createElement("button");
+    fullskjerm.type = "button";
+    fullskjerm.className = "knapp fullskjerm-knapp";
+    fullskjerm.textContent = "Se i fullskjerm";
+
+    const filvelger = document.createElement("input");
+    filvelger.type = "file";
+    filvelger.accept = "image/*";
+    filvelger.hidden = true;
+
+    const bilde = document.createElement("img");
+    bilde.className = "forhandsvis";
+    bilde.alt = "";
+
+    function settBilde(sti) {
+      punkt.bilde = sti;
+      input.value = sti;
+      oppdaterForhandsvis();
+      lagreUtkast();
+    }
+
+    function oppdaterForhandsvis() {
+      if (punkt.bilde) bilde.src = "../" + punkt.bilde;
+      else bilde.removeAttribute("src");
+    }
+
+    input.addEventListener("input", function () {
+      punkt.bilde = input.value.trim();
+      oppdaterForhandsvis();
+      lagreUtkast();
+    });
+
+    velg.addEventListener("click", function () { filvelger.click(); });
+
+    // Filen kan ikke lastes opp herfra — GitHub Pages er statisk. Vi noterer
+    // filnavnet og viser bildet lokalt, så du ser hvordan det blir. Selve filen
+    // må du legge i bilder-mappen og committe.
+    filvelger.addEventListener("change", function () {
+      const fil = filvelger.files && filvelger.files[0];
+      if (!fil) return;
+      settBilde("bilder/" + fil.name);
+      bilde.src = URL.createObjectURL(fil);
+      alert("Filnavnet er satt til «bilder/" + fil.name + "».\n\n" +
+        "Husk å legge selve filen i mappen sjekkliste/bilder/ og committe den, " +
+        "ellers finnes ikke bildet på nettsiden.");
+    });
+
+    fullskjerm.addEventListener("click", function () {
+      fvTittel.textContent = punkt.tittel || "";
+      fvTekst.textContent = punkt.beskrivelse || "";
+      if (punkt.bilde) fvBilde.src = "../" + punkt.bilde;
+      else fvBilde.removeAttribute("src");
+      forhandsvisning.hidden = false;
+    });
+
+    felt.appendChild(velg);
+    felt.appendChild(document.createTextNode(" "));
+    felt.appendChild(fullskjerm);
+    felt.appendChild(filvelger);
+
+    oppdaterForhandsvis();
+
+    rad.appendChild(felt);
+    rad.appendChild(bilde);
+    return rad;
+  }
+
+  function flytt(liste, fra, retning) {
+    const til = fra + retning;
+    if (til < 0 || til >= liste.punkter.length) return;
+    const flyttet = liste.punkter.splice(fra, 1)[0];
+    liste.punkter.splice(til, 0, flyttet);
+    lagreUtkast();
+    tegn();
+  }
+
+  // ---------------- Verktøylinje ----------------
+  document.getElementById("ny-liste").addEventListener("click", function () {
+    data.lister.push({ id: nyId("liste"), navn: "Ny sjekkliste", punkter: [] });
+    lagreUtkast();
+    tegn();
+  });
+
+  document.getElementById("last-ned").addEventListener("click", function () {
+    const tekst = JSON.stringify(data, null, 2) + "\n";
+    const url = URL.createObjectURL(new Blob([tekst], { type: "application/json" }));
+    const lenke = document.createElement("a");
+    lenke.href = url;
+    lenke.download = "data.json";
+    document.body.appendChild(lenke);
+    lenke.click();
+    lenke.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById("forkast").addEventListener("click", function () {
+    if (!confirm("Forkaste endringene og hente inn data.json på nytt?")) return;
+    try { localStorage.removeItem(LAGER_NOKKEL); } catch (err) {}
+    endret = false;
+    ulagret.hidden = true;
+    hentFraFil();
+  });
+
+  document.getElementById("fv-lukk").addEventListener("click", function () {
+    forhandsvisning.hidden = true;
+  });
+});
+</script>
+</body>
+</html>
