@@ -7,6 +7,7 @@
 <title>Sjekklister – Flyt</title>
 <link rel="stylesheet" href="../auth.css">
 <script src="../auth.js"></script>
+<script src="sjekkliste-data.js"></script>
 <style>
   :root {
     --bg: #f7f7f5;
@@ -305,8 +306,7 @@ FlytAuth.krevAdgang(function () {
   let wakeLock = null;
 
   // Avkrysninger lagres bevisst ikke: listen skal starte blank hver gang
-  fetch("data.json", { cache: "no-store" })
-    .then(function (r) { return r.json(); })
+  Sjekkliste.hentLister()
     .then(function (json) {
       data = json;
       visOversikt();
@@ -320,6 +320,13 @@ FlytAuth.krevAdgang(function () {
     stoppWakeLock();
     aktivListe = null;
     listeKnapper.innerHTML = "";
+
+    if (!(data.lister || []).length) {
+      const tom = document.createElement("p");
+      tom.className = "intro";
+      tom.textContent = "Ingen sjekklister ennå. Opprett dem under /sjekkliste/admin.";
+      listeKnapper.appendChild(tom);
+    }
 
     (data.lister || []).forEach(function (liste) {
       const knapp = document.createElement("button");

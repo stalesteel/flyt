@@ -50,65 +50,54 @@ alle ut umiddelbart, bytt også `STORAGE_KEY` i `auth.js`.
 
 ## Sjekklister
 
-### Innhold
+### Hvor innholdet ligger
 
-Sjekklistene ligger i [`sjekkliste/data.json`](sjekkliste/data.json):
+Sjekklistene lagres i en **hosted table i ArcGIS Online**, ikke i repoet. Det er grunnen
+til at `/sjekkliste/admin` kan lagre direkte fra mobilen — GitHub Pages er statisk og kan
+ikke ta imot noe som helst.
 
-```json
-{
-  "lister": [
-    {
-      "id": "ankomst",
-      "navn": "Ankomst båt – før tur",
-      "punkter": [
-        {
-          "id": "fortoyning",
-          "tittel": "Fortøyninger og fendere",
-          "beskrivelse": "Sjekk at tauverk er helt og riktig festet.",
-          "bilde": "bilder/fortoyning.jpg"
-        }
-      ]
-    }
-  ]
-}
-```
+Tjenesten: `SjekklisteFlyt/FeatureServer/0`
+(URL-en står i [`sjekkliste/sjekkliste-data.js`](sjekkliste/sjekkliste-data.js).)
 
-Rekkefølgen i `punkter` er rekkefølgen de vises i. Avkrysninger lagres ikke — en liste
-starter alltid blank.
+Én rad per sjekkpunkt, med disse feltene:
+
+| Felt | Type | Hva det er |
+|---|---|---|
+| `ListeId` | String (50) | Knytter punktet til en sjekkliste |
+| `ListeNavn` | String (100) | Navnet på listen, likt på alle radene i den |
+| `Tittel` | String (200) | Overskriften på punktet |
+| `Beskrivelse` | String (1000) | Teksten under overskriften |
+| `Rekkefolge` | Integer | Rekkefølgen punktet vises i |
+
+Bildet ligger som **attachment** på raden. Laget må ha attachments påslått, og Add,
+Update og Delete tillatt under Editing.
+
+En sjekkliste finnes bare så lenge den har minst ett punkt, siden navnet ligger på radene.
+Sletter du alle punktene, forsvinner listen.
+
+Avkrysninger lagres ikke noe sted — en liste starter alltid blank.
 
 ### Bilder
 
-Legg bildene i [`sjekkliste/bilder/`](sjekkliste/bilder/) og vis til dem som
-`bilder/filnavn.jpg` i `data.json`.
+Bilder legges inn fra admin, også rett fra mobilkameraet. De skaleres ned til maks
+1400 piksler og komprimeres til JPG før opplasting.
 
-- **Format:** JPG eller WebP. WebP gir minst filer.
-- **Størrelse:** stående format, rundt 900 × 1200 piksler holder godt. Maks ca. 1200 px høyde.
 - **Motivet må ligge i øverste halvdel.** Bildet fyller hele skjermen og beskjæres fra
   toppen, og den nederste tredjedelen dekkes av tekstbåndet.
+- Stående format passer best.
 - Mangler bildet, vises en nøytral mørk bakgrunn i stedet for et ødelagt bilde.
-
-`plassholder-*.svg` er midlertidige testbilder og kan slettes når du har lagt inn dine egne.
 
 ### Redigere sjekklistene
 
-`/sjekkliste/admin` lar deg opprette og slette lister, legge til og endre punkter, og
-flytte punkter opp og ned. Endringene lagres fortløpende i nettleseren din, så du ikke
-mister arbeid ved en refresh.
+`/sjekkliste/admin` lar deg opprette og slette lister, legge til og endre punkter, flytte
+punkter opp og ned, og bytte bilde. **Alt lagres med én gang** og er synlig på
+`/sjekkliste` umiddelbart. Tekstfelt lagres når du forlater feltet, ikke for hvert tastetrykk.
 
-**Endringene blir ikke publisert av seg selv.** GitHub Pages er statisk, og admin kan
-ikke skrive til repoet — det ville krevd en GitHub-token i en offentlig side, altså
-skriverettigheter til repoet for hvem som helst.
+Merk at tabellen tar imot endringer fra hvem som helst som kommer gjennom innloggingen,
+uten videre autentisering mot ArcGIS — samme oppsett som interessepunktene i kartet.
 
-Slik legger du inn endringene:
-
-1. Trykk **«Last ned data.json»** i admin.
-2. Erstatt `sjekkliste/data.json` i prosjektet med filen du lastet ned.
-3. Commit og push. Endringene er live etter et minutt eller to.
-
-Bilder må legges inn på samme måte: velger du en bildefil i admin, noteres bare filnavnet.
-Selve filen må du kopiere inn i `sjekkliste/bilder/` og committe.
-
-Knappen **«Forkast endringer»** sletter utkastet i nettleseren og henter `data.json` på nytt.
+[`sjekkliste/data.json`](sjekkliste/data.json) er bare startinnholdet som ble lagt inn i
+tabellen første gang. Filen brukes ikke av appen og kan slettes.
 
 ## Kartet
 

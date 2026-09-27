@@ -7,6 +7,7 @@
 <title>Rediger sjekklister – Flyt</title>
 <link rel="stylesheet" href="../../auth.css">
 <script src="../../auth.js"></script>
+<script src="../sjekkliste-data.js"></script>
 <style>
   :root {
     --bg: #f7f7f5;
@@ -36,28 +37,20 @@
   h1 { font-size: 1.4rem; margin: 0 0 4px; }
   .intro { margin: 0 0 20px; color: var(--text-muted); font-size: 0.92rem; line-height: 1.5; }
 
-  .ulagret {
+  #melding {
     margin: 0 0 18px;
     padding: 12px 14px;
     border-radius: 10px;
-    border-left: 4px solid #c9a227;
-    background: #fdf6e3;
     font-size: 0.9rem;
     line-height: 1.5;
   }
+  #melding.jobber { background: #eef3f7; border-left: 4px solid #4a7fa5; }
+  #melding.ok { background: #eef7f1; border-left: 4px solid var(--accent); }
+  #melding.feil { background: #fdeceb; border-left: 4px solid var(--error); }
 
-  .verktoylinje {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 24px;
-  }
+  .verktoylinje { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
 
-  button {
-    font-family: inherit;
-    font-size: 0.92rem;
-    cursor: pointer;
-  }
+  button { font-family: inherit; font-size: 0.92rem; cursor: pointer; }
 
   .knapp {
     padding: 11px 14px;
@@ -70,6 +63,7 @@
   .knapp.primar { background: var(--accent); border-color: var(--accent); color: #fff; }
   .knapp.fare { color: var(--error); }
   .knapp:active { opacity: 0.75; }
+  .knapp:disabled { opacity: 0.5; cursor: default; }
 
   .liste-kort {
     margin-bottom: 20px;
@@ -104,12 +98,7 @@
     border-radius: 12px;
     background: var(--bg);
   }
-  .punkt-topp {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 10px;
-  }
+  .punkt-topp { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   .punkt-nr {
     flex-shrink: 0;
     width: 26px; height: 26px;
@@ -164,9 +153,6 @@
     background: linear-gradient(160deg, #3a4048, #23262b);
   }
 
-  .fullskjerm-knapp { margin-top: 2px; }
-
-  /* Forhåndsvisning i fullskjerm, som i selve sjekklisten */
   #forhandsvisning {
     position: fixed;
     inset: 0;
@@ -204,19 +190,14 @@
 <main>
   <h1>Rediger sjekklister</h1>
   <p class="intro">
-    Endringer lagres i denne nettleseren mens du jobber. For at de skal gjelde på
-    ordentlig må du laste ned <code>data.json</code> og legge den inn i prosjektet.
-    Se README for framgangsmåten.
+    Endringer lagres med én gang, og er synlige på <code>/sjekkliste</code> umiddelbart.
   </p>
 
-  <p class="ulagret" id="ulagret" hidden>
-    Du har endringer som ennå ikke er lagt inn i prosjektet. Trykk «Last ned data.json».
-  </p>
+  <p id="melding" hidden></p>
 
   <div class="verktoylinje">
-    <button type="button" class="knapp primar" id="last-ned">Last ned data.json</button>
     <button type="button" class="knapp" id="ny-liste">Ny sjekkliste</button>
-    <button type="button" class="knapp fare" id="forkast">Forkast endringer</button>
+    <button type="button" class="knapp" id="oppdater">Hent på nytt</button>
   </div>
 
   <div id="lister"></div>
@@ -235,59 +216,49 @@
 FlytAuth.krevAdgang(function () {
   "use strict";
 
-  const LAGER_NOKKEL = "flyt-sjekkliste-utkast";
-
   const listerEl = document.getElementById("lister");
-  const ulagret = document.getElementById("ulagret");
+  const melding = document.getElementById("melding");
   const forhandsvisning = document.getElementById("forhandsvisning");
   const fvBilde = document.getElementById("fv-bilde");
   const fvTittel = document.getElementById("fv-tittel");
   const fvTekst = document.getElementById("fv-tekst");
 
-  let data = { lister: [] };
-  let endret = false;
+  const MAKS_BILDESIDE = 1400;
+  const BILDEKVALITET = 0.8;
 
-  // Utkastet i nettleseren vinner, så man ikke mister arbeid ved en refresh
-  const utkast = lesUtkast();
-  if (utkast) {
-    data = utkast;
-    endret = true;
-    tegn();
-  } else {
-    hentFraFil();
+  let lister = [];
+
+  function visMelding(tekst, type) {
+    melding.textContent = tekst;
+    melding.className = type || "";
+    melding.hidden = !tekst;
   }
 
-  function hentFraFil() {
-    fetch("../data.json", { cache: "no-store" })
-      .then(function (r) { return r.json(); })
-      .then(function (json) {
-        data = json && json.lister ? json : { lister: [] };
-        tegn();
-      })
+  // Alle skriveoperasjoner går gjennom denne, så feil aldri blir tause
+  function utfor(tekst, arbeid) {
+    visMelding(tekst, "jobber");
+    return arbeid()
+      .then(function () { return last(); })
+      .then(function () { visMelding("Lagret.", "ok"); })
       .catch(function (err) {
         console.error(err);
-        listerEl.textContent = "Klarte ikke å laste data.json.";
+        visMelding("Klarte ikke å lagre: " + err.message, "feil");
       });
   }
 
-  function lesUtkast() {
-    try {
-      const raw = localStorage.getItem(LAGER_NOKKEL);
-      return raw ? JSON.parse(raw) : null;
-    } catch (err) {
-      return null;
-    }
+  function last() {
+    return Sjekkliste.hentLister().then(function (data) {
+      lister = data.lister;
+      tegn();
+    });
   }
 
-  function lagreUtkast() {
-    endret = true;
-    ulagret.hidden = false;
-    try {
-      localStorage.setItem(LAGER_NOKKEL, JSON.stringify(data));
-    } catch (err) {
-      // Full eller blokkert lagring: endringene lever bare i denne økten
-    }
-  }
+  last().catch(function (err) {
+    console.error(err);
+    visMelding(
+      "Klarte ikke å hente sjekklistene. Sjekk at tabellen SjekklisteFlyt finnes i ArcGIS " +
+      "og at den tillater spørring. " + err.message, "feil");
+  });
 
   function nyId(prefiks) {
     return prefiks + "-" + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
@@ -295,10 +266,9 @@ FlytAuth.krevAdgang(function () {
 
   // ---------------- Tegning ----------------
   function tegn() {
-    ulagret.hidden = !endret;
     listerEl.innerHTML = "";
 
-    if (!data.lister.length) {
+    if (!lister.length) {
       const tom = document.createElement("p");
       tom.className = "intro";
       tom.textContent = "Ingen sjekklister ennå. Trykk «Ny sjekkliste» for å lage en.";
@@ -306,12 +276,10 @@ FlytAuth.krevAdgang(function () {
       return;
     }
 
-    data.lister.forEach(function (liste, listeIndeks) {
-      listerEl.appendChild(tegnListe(liste, listeIndeks));
-    });
+    lister.forEach(function (liste) { listerEl.appendChild(tegnListe(liste)); });
   }
 
-  function tegnListe(liste, listeIndeks) {
+  function tegnListe(liste) {
     const kort = document.createElement("div");
     kort.className = "liste-kort";
 
@@ -322,9 +290,16 @@ FlytAuth.krevAdgang(function () {
     navn.type = "text";
     navn.value = liste.navn || "";
     navn.setAttribute("aria-label", "Navn på sjekkliste");
-    navn.addEventListener("input", function () {
-      liste.navn = navn.value;
-      lagreUtkast();
+
+    // Navnet ligger på hver rad, så et nytt navn må skrives til alle punktene
+    navn.addEventListener("change", function () {
+      const nyttNavn = navn.value.trim();
+      if (!nyttNavn || nyttNavn === liste.navn) return;
+      utfor("Endrer navn…", function () {
+        return Sjekkliste.endrePunkter(liste.punkter.map(function (p) {
+          return { objectId: p.objectId, listeNavn: nyttNavn };
+        }));
+      });
     });
     topp.appendChild(navn);
 
@@ -333,16 +308,16 @@ FlytAuth.krevAdgang(function () {
     slett.className = "knapp fare";
     slett.textContent = "Slett liste";
     slett.addEventListener("click", function () {
-      if (!confirm("Slette sjekklisten «" + (liste.navn || "uten navn") + "»?")) return;
-      data.lister.splice(listeIndeks, 1);
-      lagreUtkast();
-      tegn();
+      if (!confirm("Slette sjekklisten «" + liste.navn + "» med alle punktene?")) return;
+      utfor("Sletter…", function () {
+        return Sjekkliste.slettPunkter(liste.punkter.map(function (p) { return p.objectId; }));
+      });
     });
     topp.appendChild(slett);
 
     kort.appendChild(topp);
 
-    (liste.punkter || []).forEach(function (punkt, i) {
+    liste.punkter.forEach(function (punkt, i) {
       kort.appendChild(tegnPunkt(liste, punkt, i));
     });
 
@@ -351,10 +326,15 @@ FlytAuth.krevAdgang(function () {
     nyttPunkt.className = "knapp";
     nyttPunkt.textContent = "Legg til punkt";
     nyttPunkt.addEventListener("click", function () {
-      liste.punkter = liste.punkter || [];
-      liste.punkter.push({ id: nyId("punkt"), tittel: "Nytt punkt", beskrivelse: "", bilde: "" });
-      lagreUtkast();
-      tegn();
+      utfor("Legger til…", function () {
+        return Sjekkliste.nyttPunkt({
+          listeId: liste.id,
+          listeNavn: liste.navn,
+          tittel: "Nytt punkt",
+          beskrivelse: "",
+          rekkefolge: liste.punkter.length + 1
+        });
+      });
     });
     kort.appendChild(nyttPunkt);
 
@@ -377,7 +357,7 @@ FlytAuth.krevAdgang(function () {
     flex.className = "flex";
     topp.appendChild(flex);
 
-    // Opp og ned i stedet for dra og slipp: langt mer treffsikkert på mobil
+    // Opp og ned i stedet for dra og slipp: mer treffsikkert på mobil
     const opp = document.createElement("button");
     opp.type = "button";
     opp.className = "ikonknapp";
@@ -403,28 +383,31 @@ FlytAuth.krevAdgang(function () {
     slett.setAttribute("aria-label", "Slett punkt");
     slett.addEventListener("click", function () {
       if (!confirm("Slette punktet «" + (punkt.tittel || "uten tittel") + "»?")) return;
-      liste.punkter.splice(i, 1);
-      lagreUtkast();
-      tegn();
+      utfor("Sletter…", function () { return Sjekkliste.slettPunkter([punkt.objectId]); });
     });
     topp.appendChild(slett);
 
     rad.appendChild(topp);
 
-    rad.appendChild(lagFelt("Tittel", "text", punkt.tittel || "", function (v) {
-      punkt.tittel = v;
-      lagreUtkast();
+    rad.appendChild(lagFelt("Tittel", "text", punkt.tittel, function (v) {
+      if (v === punkt.tittel) return;
+      utfor("Lagrer…", function () {
+        return Sjekkliste.endrePunkter([{ objectId: punkt.objectId, tittel: v }]);
+      });
     }));
 
-    rad.appendChild(lagFelt("Beskrivelse", "textarea", punkt.beskrivelse || "", function (v) {
-      punkt.beskrivelse = v;
-      lagreUtkast();
+    rad.appendChild(lagFelt("Beskrivelse", "textarea", punkt.beskrivelse, function (v) {
+      if (v === punkt.beskrivelse) return;
+      utfor("Lagrer…", function () {
+        return Sjekkliste.endrePunkter([{ objectId: punkt.objectId, beskrivelse: v }]);
+      });
     }));
 
-    rad.appendChild(tegnBildevelger(punkt));
+    rad.appendChild(tegnBilde(punkt));
     return rad;
   }
 
+  // Lagrer på change, ikke på hvert tastetrykk, så det ikke blir ett kall per bokstav
   function lagFelt(etikett, type, verdi, onChange) {
     const wrap = document.createElement("div");
 
@@ -434,14 +417,14 @@ FlytAuth.krevAdgang(function () {
 
     const felt = document.createElement(type === "textarea" ? "textarea" : "input");
     if (type !== "textarea") felt.type = "text";
-    felt.value = verdi;
-    felt.addEventListener("input", function () { onChange(felt.value); });
+    felt.value = verdi || "";
+    felt.addEventListener("change", function () { onChange(felt.value.trim()); });
     wrap.appendChild(felt);
 
     return wrap;
   }
 
-  function tegnBildevelger(punkt) {
+  function tegnBilde(punkt) {
     const rad = document.createElement("div");
     rad.className = "bilde-rad";
 
@@ -449,71 +432,47 @@ FlytAuth.krevAdgang(function () {
     felt.className = "felt";
 
     const label = document.createElement("label");
-    label.textContent = "Bilde (filnavn i bilder-mappen)";
+    label.textContent = punkt.bilde ? "Bilde" : "Ingen bilde";
     felt.appendChild(label);
-
-    const input = document.createElement("input");
-    input.type = "text";
-    input.value = punkt.bilde || "";
-    input.placeholder = "bilder/fortoyning.jpg";
-    felt.appendChild(input);
 
     const velg = document.createElement("button");
     velg.type = "button";
     velg.className = "knapp";
-    velg.textContent = "Velg bildefil";
+    velg.textContent = punkt.bilde ? "Bytt bilde" : "Legg til bilde";
 
     const fullskjerm = document.createElement("button");
     fullskjerm.type = "button";
-    fullskjerm.className = "knapp fullskjerm-knapp";
+    fullskjerm.className = "knapp";
     fullskjerm.textContent = "Se i fullskjerm";
 
+    // capture mangler med vilje, så man kan velge både kamera og bildebibliotek
     const filvelger = document.createElement("input");
     filvelger.type = "file";
     filvelger.accept = "image/*";
     filvelger.hidden = true;
 
-    const bilde = document.createElement("img");
-    bilde.className = "forhandsvis";
-    bilde.alt = "";
-
-    function settBilde(sti) {
-      punkt.bilde = sti;
-      input.value = sti;
-      oppdaterForhandsvis();
-      lagreUtkast();
-    }
-
-    function oppdaterForhandsvis() {
-      if (punkt.bilde) bilde.src = "../" + punkt.bilde;
-      else bilde.removeAttribute("src");
-    }
-
-    input.addEventListener("input", function () {
-      punkt.bilde = input.value.trim();
-      oppdaterForhandsvis();
-      lagreUtkast();
-    });
+    const miniatyr = document.createElement("img");
+    miniatyr.className = "forhandsvis";
+    miniatyr.alt = "";
+    if (punkt.bilde) miniatyr.src = punkt.bilde;
 
     velg.addEventListener("click", function () { filvelger.click(); });
 
-    // Filen kan ikke lastes opp herfra — GitHub Pages er statisk. Vi noterer
-    // filnavnet og viser bildet lokalt, så du ser hvordan det blir. Selve filen
-    // må du legge i bilder-mappen og committe.
     filvelger.addEventListener("change", function () {
       const fil = filvelger.files && filvelger.files[0];
       if (!fil) return;
-      settBilde("bilder/" + fil.name);
-      bilde.src = URL.createObjectURL(fil);
-      alert("Filnavnet er satt til «bilder/" + fil.name + "».\n\n" +
-        "Husk å legge selve filen i mappen sjekkliste/bilder/ og committe den, " +
-        "ellers finnes ikke bildet på nettsiden.");
+      utfor("Laster opp bilde…", function () {
+        return Sjekkliste.komprimerBilde(fil, MAKS_BILDESIDE, BILDEKVALITET)
+          .then(function (blob) {
+            return Sjekkliste.lagreBilde(punkt.objectId, blob, punkt.attachmentId);
+          });
+      });
     });
 
     fullskjerm.addEventListener("click", function () {
       fvTittel.textContent = punkt.tittel || "";
       fvTekst.textContent = punkt.beskrivelse || "";
-      if (punkt.bilde) fvBilde.src = "../" + punkt.bilde;
+      if (punkt.bilde) fvBilde.src = punkt.bilde;
       else fvBilde.removeAttribute("src");
       forhandsvisning.hidden = false;
     });
@@ -523,47 +482,46 @@ FlytAuth.krevAdgang(function () {
     felt.appendChild(fullskjerm);
     felt.appendChild(filvelger);
 
-    oppdaterForhandsvis();
-
     rad.appendChild(felt);
-    rad.appendChild(bilde);
+    rad.appendChild(miniatyr);
     return rad;
   }
 
   function flytt(liste, fra, retning) {
     const til = fra + retning;
     if (til < 0 || til >= liste.punkter.length) return;
-    const flyttet = liste.punkter.splice(fra, 1)[0];
-    liste.punkter.splice(til, 0, flyttet);
-    lagreUtkast();
-    tegn();
+
+    const rekkefolge = liste.punkter.slice();
+    const flyttet = rekkefolge.splice(fra, 1)[0];
+    rekkefolge.splice(til, 0, flyttet);
+
+    utfor("Endrer rekkefølge…", function () {
+      return Sjekkliste.endrePunkter(rekkefolge.map(function (p, i) {
+        return { objectId: p.objectId, rekkefolge: i + 1 };
+      }));
+    });
   }
 
   // ---------------- Verktøylinje ----------------
+  // En liste finnes bare så lenge den har punkter, siden navnet ligger på radene
   document.getElementById("ny-liste").addEventListener("click", function () {
-    data.lister.push({ id: nyId("liste"), navn: "Ny sjekkliste", punkter: [] });
-    lagreUtkast();
-    tegn();
+    const navn = prompt("Navn på den nye sjekklisten:");
+    if (!navn || !navn.trim()) return;
+    utfor("Oppretter…", function () {
+      return Sjekkliste.nyttPunkt({
+        listeId: nyId("liste"),
+        listeNavn: navn.trim(),
+        tittel: "Nytt punkt",
+        beskrivelse: "",
+        rekkefolge: 1
+      });
+    });
   });
 
-  document.getElementById("last-ned").addEventListener("click", function () {
-    const tekst = JSON.stringify(data, null, 2) + "\n";
-    const url = URL.createObjectURL(new Blob([tekst], { type: "application/json" }));
-    const lenke = document.createElement("a");
-    lenke.href = url;
-    lenke.download = "data.json";
-    document.body.appendChild(lenke);
-    lenke.click();
-    lenke.remove();
-    URL.revokeObjectURL(url);
-  });
-
-  document.getElementById("forkast").addEventListener("click", function () {
-    if (!confirm("Forkaste endringene og hente inn data.json på nytt?")) return;
-    try { localStorage.removeItem(LAGER_NOKKEL); } catch (err) {}
-    endret = false;
-    ulagret.hidden = true;
-    hentFraFil();
+  document.getElementById("oppdater").addEventListener("click", function () {
+    visMelding("Henter…", "jobber");
+    last().then(function () { visMelding("", ""); })
+      .catch(function (err) { visMelding("Klarte ikke å hente: " + err.message, "feil"); });
   });
 
   document.getElementById("fv-lukk").addEventListener("click", function () {
