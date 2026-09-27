@@ -96,8 +96,8 @@ punkter opp og ned, og bytte bilde. **Alt lagres med én gang** og er synlig på
 Merk at tabellen tar imot endringer fra hvem som helst som kommer gjennom innloggingen,
 uten videre autentisering mot ArcGIS — samme oppsett som interessepunktene i kartet.
 
-[`sjekkliste/data.json`](sjekkliste/data.json) er bare startinnholdet som ble lagt inn i
-tabellen første gang. Filen brukes ikke av appen og kan slettes.
+Startinnholdet ble lagt inn i tjenesten én gang via REST. Det finnes ingen JSON-fil i
+repoet lenger — all redigering skjer i admin.
 
 ## Kartet
 
