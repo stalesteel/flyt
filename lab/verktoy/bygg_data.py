@@ -14,8 +14,8 @@ Trinnene:
               Kilde: NVE (åpne tjenester).
   dybde       Dybdekurvene innenfor interesseområdet. Kilde: NVE.
   samferdsel  Veier, parkering, holdeplasser og traktorveier inntil 1 km utenfor
-              interesseområdet, og store veier inntil 20 km utenfor. Hvert
-              objekt får et felt "fade" (0–1) som tones ut mot yttergrensen.
+              interesseområdet. Hvert objekt får et felt "fade" (0–1) som tones
+              ut mot yttergrensen.
               Kilde: GeomapSamferdsel i GeodataOnline.
               Krever token i miljøvariabelen GDO_TOKEN. Uten token brukes
               proxyen som webkartet i AGOL har lagret innloggingen i.
@@ -57,12 +57,19 @@ til_wgs = Transformer.from_crs(25833, 4326, always_xy=True).transform
 # Avstand fra vannet til kanten av interesseområdet
 OMRADE_BUFFER_M = 2000
 
-# Samferdsel tas med et stykke utenfor interesseområdet og fades ut mot
-# kanten, så det ikke blir en hard grense. Avstandene er fra interesseområdet.
+# Samferdsel tas med inntil 1 km utenfor interesseområdet og fades ut mot
+# kanten, så det ikke blir en hard grense
 SAMFERDSEL_FADE_M = (0, 1000)          # full styrke ved kanten, borte etter 1 km
-STOR_VEG_FADE_M = (10000, 20000)       # store veier: full til 10 km, borte etter 20 km
-STOR_VEG_KATEGORI = ("E", "R", "F")    # Europa-, riks- og fylkesveg
-STOR_VEG_TYPE = ("Enkel bilveg", "Kanalisert veg", "Rampe", "Rundkjøring")
+
+# Hovedveiene ligger i et eget lag som vises på alle zoomnivåer
+HOVEDVEG_KATEGORI = ("E", "R", "F")    # Europa-, riks- og fylkesveg
+HOVEDVEG_TYPE = ("Enkel bilveg", "Kanalisert veg", "Rampe", "Rundkjøring")
+# Veityper som bare er støy i et båtkart
+UTELATT_VEGTYPE = ("Fortau", "Gangfelt", "Trapp", "Sti")
+
+# Dybdekurvene deles i biter på høyst så mange meter. Korte biter tegnes og
+# etiketteres langt raskere enn én lang linje rundt hele innsjøen.
+DYBDE_BITLENGDE_M = 1500
 
 # Stedene som avgrenser vassdraget. Hjørnene i et firkantpolygon, i rekkefølge.
 AVGRENSNING = [
@@ -203,10 +210,27 @@ def bygg_dybde():
         spatialRel="esriSpatialRelIntersects", outFields="innsjonavn,dybde_m"))
     ut = []
     for f in features:
-        geom = esri_til_shapely(f["geometry"]).simplify(1)
-        a = f["attributes"]
-        ut.append(som_feature(geom, {"dybde_m": a["dybde_m"], "innsjonavn": a["innsjonavn"]}, 6))
+        geom = esri_til_shapely(f["geometry"]).simplify(1.5)
+        for bit in del_linje(geom, DYBDE_BITLENGDE_M):
+            ut.append(som_feature(bit, {"dybde_m": f["attributes"]["dybde_m"]}, 5))
     skriv_geojson(os.path.join(DATA, "dybdekurver.geojson"), ut)
+
+
+def del_linje(geom, maks):
+    """Deler en linje i biter på høyst maks meter, uten å miste punkter."""
+    linjer = geom.geoms if hasattr(geom, "geoms") else [geom]
+    for linje in linjer:
+        punkter = list(linje.coords)
+        bit = [punkter[0]]
+        lengde = 0
+        for a, b in zip(punkter, punkter[1:]):
+            bit.append(b)
+            lengde += math.dist(a, b)
+            if lengde >= maks:
+                yield LineString(bit)
+                bit, lengde = [b], 0
+        if len(bit) > 1:
+            yield LineString(bit)
 
 
 # Sublagene fra GeomapSamferdsel som tas med, og feltene som beholdes
@@ -319,19 +343,24 @@ def bygg_samferdsel():
 
     naer = Fade(omrade, *SAMFERDSEL_FADE_M, steg=10)
     for navn, (lag_id, felt) in SAMFERDSEL.items():
-        features = hent_samferdsel(base, token, lag_id, felt, naer.ytre)
-        # De store veiene ligger i et eget lag som når mye lenger ut
-        filter = (lambda a: a.get("vegkategori") not in STOR_VEG_KATEGORI) if navn == "veg" else None
-        linjelag = navn in ("veg", "traktorveg", "anleggsveg")
-        skriv_geojson(os.path.join(DATA, "samferdsel", navn + ".geojson"),
-                      fadede_features(features, felt, naer, filter, slaa_sammen=linjelag, forenkle=1.5))
+        extra = ["typeveg"] if navn == "veg" else []
+        features = hent_samferdsel(base, token, lag_id, felt + extra, naer.ytre)
+        if navn != "veg":
+            linjelag = navn in ("traktorveg", "anleggsveg")
+            skriv_geojson(os.path.join(DATA, "samferdsel", navn + ".geojson"),
+                          fadede_features(features, felt, naer, slaa_sammen=linjelag, forenkle=1.5))
+            continue
 
-    fjern = Fade(omrade, *STOR_VEG_FADE_M, steg=20)
-    where = "vegkategori in ({}) and typeveg in ({})".format(
-        ",".join(f"'{k}'" for k in STOR_VEG_KATEGORI), ",".join(f"'{t}'" for t in STOR_VEG_TYPE))
-    features = hent_samferdsel(base, token, 21, ["vegkategori"], fjern.ytre.simplify(200), where)
-    skriv_geojson(os.path.join(DATA, "samferdsel", "stor_veg.geojson"),
-                  fadede_features(features, ["vegkategori"], fjern, slaa_sammen=True, forenkle=3))
+        # Veiene deles i hovedveier, som vises på alle zoomnivåer, og resten
+        def er_hovedveg(a):
+            return a.get("vegkategori") in HOVEDVEG_KATEGORI and a.get("typeveg") in HOVEDVEG_TYPE
+
+        def er_annen_veg(a):
+            return not er_hovedveg(a) and a.get("typeveg") not in UTELATT_VEGTYPE
+
+        for filnavn, filter in (("hovedveg", er_hovedveg), ("veg", er_annen_veg)):
+            skriv_geojson(os.path.join(DATA, "samferdsel", filnavn + ".geojson"),
+                          fadede_features(features, felt, naer, filter, slaa_sammen=True, forenkle=1.5))
 
 
 def bygg_agol():

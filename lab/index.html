@@ -599,19 +599,23 @@
   // Hvor mørkt kartet blir utenfor interesseområdet (0–1), og overgangen:
   // dimmingen begynner DIM_FADE_START meter innenfor kanten av området og
   // er full DIM_FADE_END meter utenfor, fordelt på DIM_FADE_STEPS trinn.
-  const DIM_OPACITY = 0.62;
+  const DIM_OPACITY = 0.75;
   const DIM_FADE_START = -400;
   const DIM_FADE_END = 1200;
   const DIM_FADE_STEPS = 12;
 
-  // Synligheten i Samferdsel styres på kartbildets høyde i kilometer, ikke
-  // målestokk, som ville variert med skjermhøyden.
-  const SAMFERDSEL_NEAR_KM = 15;
-  const SAMFERDSEL_CLOSEST_KM = 7;
+  // Synligheten i Samferdsel styres på hvor mange kilometer kartbildet
+  // dekker på den lengste leden, ikke målestokk, som ville variert med
+  // skjermstørrelsen. Hovedveiene vises alltid.
+  const SAMFERDSEL_VEG_KM = 4;       // øvrige veier, traktorveier og anleggsveier
+  const SAMFERDSEL_PUNKT_KM = 10;    // parkering, buss og tog
 
-  // Symbolene er de samme som GeomapSamferdsel bruker
-  const PIN_PARKERING = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAXCAYAAADgKtSgAAAACXBIWXMAAA7EAAAOxAGVKw4bAAABcElEQVRIiWNhoCFgGR6GL9h6ff7DF58c/v9nYCTZICamv/KSvDNiPTW6sRp++OKz+LmbrpFsMAx05lhlMTAwYDf8z59/KAbzcrExMDGhGvDl22+Gv//+YzX8z59/zCi+weeSS0siGBQk+VDEfv3+y7Bm/12G/P5DDG8+/KBuhLKxMjNEuakxGKqJMhjFr2D48esvZYZH1O5kWLnnNpitpyLMsLnHh0FTQZAhK1iXoW/5Beq5/NKdtwwz119laM2wYDBSF6V+OjeCGkqVME/x02JwMJJmYGRkYNBSEGKwNZBi+P3nH8P8rdcpN9zFVBaMYeD7zz8M2T0HGS7efkO54Wv23WG4cu8dmP3u0w+GTYfvMzx88ZmgPuIM338XnlpGYKmIDuKb9jBwsrMwXLyDP+KIMpwRlNaQwKELzxhIAYwMjP9xGq6vKnwh3FlV9z/Df9LLc2am/2JCnAdxGl4YYWhIqqHIYBm6hZQYRgjQ1HAA49lzLhT8pFEAAAAASUVORK5CYII=";
-  const PIN_BUSS = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAXCAYAAADgKtSgAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAB50lEQVRIiWNhoCFgGR6GS8Rv9I60le3mYGXmI9kgZsb/2vL8SyJs5SuxGs7EwJDWv/GWJrkubYnRDWdgYMBu+L///zGCSVmCh8HHVIpBXoyLgZ+bjeHtp58Mt59/Zth08hnDyw8/UNT++fufCcU3uFzBxc7MsKHahsFFX4Iha8YZhov3P8Dl5ES5GZ4t9GOYu+s+Q9rU0zh9gtNwLxMpBhVJXoaVRx4x2OuIYcivPvKYIcRahqFr3XWGO8+/kGa4qiQPQ8ea6wyzdt7F6bL+FEMGVSle0g2XEORguPgAERTYwKPX3xhkRDhxyuM0XFKIk+HVh594DX/98QeDsiQP6YZLCHCAkhbD/ZdfcWo2VBZgOHXrHemGMzIyMrgbSTAQAqdvk2E4CHStu8FgqirE4KiLmVoW7nvAwMGKkqxJM5yfi5WBk40ZqxwPBwsDOysTw+tPP8kzPN1DGadcsJUMmJ6y9TbphpfMu8CwusIKHGGzd2Gm9aYoXYZff/4xTNt2h3TDT956y7D80COGo9feMOw89wJDXkOaj+H7r78M1x9/Is7wn7///kLmly+4iFPjxM23MMR+//33Dafh7z//3iTCx87GxcGCO9vhAoz//2w4+XQKTsMZtkTMf8PAMJ9kg3GAoVuHAgD3T5Vnlr8iFwAAAABJRU5ErkJggg==";
+  // Farger på de nye punktsymbolene. Bussgrønn som de grønne regionbussene
+  // rundt Oslo, og vanlig parkeringsblå.
+  const BUSS_GRONN = "#4f9d2d";
+  const PARKERING_BLA = "#1f6fd1";
+
+  // Togsymbolet er det samme som GeomapSamferdsel bruker
   const PIN_TOG = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAXCAYAAADgKtSgAAAACXBIWXMAAA7EAAAOxAGVKw4bAAACGklEQVRIiWNhoCFgGR6GS8Rv9I60le3mYGXmI9kgZsb/2vL8SyJs5SuxGs7EwJDWv/GWJjbN0sKcDB+//mZgZ2ViePv5F1YLWmJ0wxkYGLAb/u//f6zBxMzEyJDgrMhw+9lnBjYWJoblhx4x/P33H0Pdn7//mVB8g8+rsiJcDNsb7Bi05fgZGpdfBbs4yFKGYXGRBcOxG28YPBsOMXz69hunfryGxzoqgC1Yc/Qxw8dvvxkEuFkZnr37zrDhxFMGT2NJBh9TKYZlBx+SZzgnGzPD9O13GCoWXsKQW1RoDpanKCn++YsZtiDw688/QloJG57grAhOIciWcLAxMwRbyTIcv/GWMsOlhTkZSgI1CLqSLMMpAXgN//f/P8OcXfcYZu+6y3CyxxUs9vvvPwbFlC0M8/PNwPJkG7734kuGWTmmDEK8bHAxVmYmhuZoXQZVKV6GI9fekG/4oauvGSZuusUwLdMYRTzRRZHBre4gOMeSbTgvJwtDWbAGQ9rU0wyPXn+DixsrCzE0x+gw7Lv0EmsxQJThvUmGDBtPPmWYvfMeivjOcy8YzNWFGMqCNBja11wnzvCfv//Cizt2ViaGk7feMiw/hD17p04+w+BuJMHAyMjAAIvX33//fcNp+PvPvzeJ8LGzcXGwcIL4uy+8ZBDh48DpsoNXXjPIinBDOIz//2w4+XQKTsMZtkTMf8PAMB+naSSCoVuHAgDvArB4zw2CRgAAAABJRU5ErkJggg==";
 
   const PARKERING_FIELDS = [
@@ -647,11 +651,13 @@
     },
     {
       title: "Gråtone",
+      light: true,   // lys bakgrunn: dybdekurvene får mørkere farger
       type: "vector",
       styleUrl: "https://services.geodataonline.no/arcgis/rest/services/GeocacheVector/GeocacheGraatone/VectorTileServer/resources/styles/root.json"
     },
     {
       title: "Basis terreng",
+      light: true,
       type: "vector-multi",
       styleUrls: [
         "https://services.geodataonline.no/arcgis/rest/services/GeocacheVector/GeocacheOSMBasis/VectorTileServer/resources/styles/root.json",
@@ -1053,7 +1059,8 @@
       return null;
     }
 
-    const map = new EsriMap({ basemap: buildBasemap(BASEMAPS[0]) });
+    let currentBasemap = 0;
+    const map = new EsriMap({ basemap: buildBasemap(BASEMAPS[currentBasemap]) });
 
     const view = new MapView({
       container: "viewDiv",
@@ -1257,6 +1264,31 @@
       return { type: "picture-marker", url: "data:image/png;base64," + base64, width: size, height: size };
     }
 
+    // Avrundet firkant med hvit kant og et hvitt piktogram
+    function badgeMarker(fill, pictogram, size) {
+      const svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24">' +
+        '<rect x="1" y="1" width="22" height="22" rx="5.5" fill="' + fill + '" stroke="#fff" stroke-width="1.6"/>' +
+        pictogram.replace(/FILL/g, fill) +
+        '</svg>';
+      return {
+        type: "picture-marker",
+        url: "data:image/svg+xml;base64," + btoa(svg),
+        width: size,
+        height: size
+      };
+    }
+
+    const PARKERING_SYMBOL = badgeMarker(PARKERING_BLA,
+      '<path fill="#fff" fill-rule="evenodd" d="M8.6 5.6h4.6a4 4 0 0 1 0 8h-1.9v4.8H8.6zM11.3 8.1v3h1.8a1.5 1.5 0 0 0 0-3z"/>',
+      15);
+
+    const BUSS_SYMBOL = badgeMarker(BUSS_GRONN,
+      '<path fill="#fff" d="M7.2 5.2h9.6a1.7 1.7 0 0 1 1.7 1.7v9.6a1 1 0 0 1-1 1h-.4v1.3a.8.8 0 0 1-1.6 0v-1.3H8.5v1.3a.8.8 0 0 1-1.6 0v-1.3h-.4a1 1 0 0 1-1-1V6.9a1.7 1.7 0 0 1 1.7-1.7z"/>' +
+      '<rect x="7" y="7.2" width="10" height="4.8" rx=".7" fill="FILL"/>' +
+      '<circle cx="8.6" cy="14.7" r="1.05" fill="FILL"/><circle cx="15.4" cy="14.7" r="1.05" fill="FILL"/>',
+      15);
+
     // Veirenderer for både de nære veiene og de store veiene langt ute
     const VEG_RENDERER = {
       type: "unique-value",
@@ -1277,34 +1309,35 @@
     const FADE_VV = { type: "opacity", field: "fade", stops: [{ value: 0, opacity: 0 }, { value: 1, opacity: 1 }] };
 
     // Sublagene fra GeomapSamferdsel, med symbologien fra tjenesten og
-    // webkartets overstyringer (størrelser og traktorveifarge). stor_veg er
-    // europa-, riks- og fylkesveier inntil 20 km ut; veg er resten.
-    // near: vises når kartbildet er lavere enn SAMFERDSEL_NEAR_KM,
-    // closest: vises når det er lavere enn SAMFERDSEL_CLOSEST_KM.
+    // webkartets overstyringer (størrelser og traktorveifarge). hovedveg er
+    // europa-, riks- og fylkesveier; veg er resten.
+    // maxKm: vises bare når kartbildet dekker høyst så mange km. Et lag som
+    // ikke vises, lastes heller ikke ned, så de tunge lagene koster ingenting
+    // før man zoomer inn.
     const SAMFERDSEL_LAYERS = [
-      { key: "stor_veg", range: "always", renderer: VEG_RENDERER },
-      { key: "veg", range: "always", renderer: VEG_RENDERER },
+      { key: "veg", maxKm: SAMFERDSEL_VEG_KM, renderer: VEG_RENDERER },
+      { key: "hovedveg", renderer: VEG_RENDERER },
       {
         key: "traktorveg",
-        range: "closest",
+        maxKm: SAMFERDSEL_VEG_KM,
         renderer: { type: "simple", symbol: { type: "simple-line", color: [0, 171, 57, 1], width: 1 } }
       },
       {
         key: "anleggsveg",
-        range: "near",
+        maxKm: SAMFERDSEL_VEG_KM,
         renderer: { type: "simple", symbol: { type: "simple-line", style: "dash", color: [156, 156, 156, 1], width: 2.5 } }
       },
       {
         key: "traktorvegsperring",
-        range: "closest",
+        maxKm: SAMFERDSEL_VEG_KM,
         renderer: {
           type: "simple",
           symbol: { type: "simple-marker", style: "circle", color: [230, 0, 0, 0.6], size: 6, outline: { color: [0, 0, 0, 1], width: 0.6 } }
         }
       },
-      { key: "parkering", range: "near", clickable: true, renderer: { type: "simple", symbol: pictureMarker(PIN_PARKERING, 13.5) } },
-      { key: "buss", range: "near", clickable: true, renderer: { type: "simple", symbol: pictureMarker(PIN_BUSS, 26.25) } },
-      { key: "tog", range: "near", clickable: true, renderer: { type: "simple", symbol: pictureMarker(PIN_TOG, 17) } }
+      { key: "parkering", maxKm: SAMFERDSEL_PUNKT_KM, clickable: true, renderer: { type: "simple", symbol: PARKERING_SYMBOL } },
+      { key: "buss", maxKm: SAMFERDSEL_PUNKT_KM, clickable: true, renderer: { type: "simple", symbol: BUSS_SYMBOL } },
+      { key: "tog", maxKm: SAMFERDSEL_PUNKT_KM, clickable: true, renderer: { type: "simple", symbol: pictureMarker(PIN_TOG, 15) } }
     ];
 
     const samferdselByLayer = new Map();
@@ -1316,7 +1349,7 @@
           title: def.key,
           outFields: ["*"],
           renderer: Object.assign({}, def.renderer, { visualVariables: [FADE_VV] }),
-          visible: def.range === "always"
+          visible: !def.maxKm
         });
         samferdselByLayer.set(layer, def);
         return layer;
@@ -1333,12 +1366,10 @@
     function updateSamferdselVisibility() {
       if (!layerRefs.samferdsel || !view.extent) return;
 
-      // Kartets utstrekning er i meter (UTM33), altså høyden fra topp til bunn
-      const heightKm = view.extent.height / 1000;
+      // Kartets utstrekning er i meter (UTM33). Den lengste leden teller.
+      const spanKm = Math.max(view.extent.width, view.extent.height) / 1000;
       samferdselByLayer.forEach(function (def, layer) {
-        const visible = def.range === "always" ||
-          (def.range === "near" && heightKm <= SAMFERDSEL_NEAR_KM) ||
-          (def.range === "closest" && heightKm <= SAMFERDSEL_CLOSEST_KM);
+        const visible = !def.maxKm || spanKm <= def.maxKm;
         if (layer.visible !== visible) layer.visible = visible;
       });
     }
@@ -1352,27 +1383,68 @@
       }
     );
 
+    // ---------------- Dybdekurver ----------------
+    // Webkartets lyse kurver og hvite tall er laget for flyfoto. På de lyse
+    // bakgrunnskartene brukes mørkere blåtoner og mørke tall med hvit halo.
+    const dybdeStil = {};
+
+    function dybdeLabels(color, haloColor) {
+      const symbol = { type: "text", color: color, font: { family: "Arial", size: 12.5 } };
+      if (haloColor) {
+        symbol.haloColor = haloColor;
+        symbol.haloSize = 1.2;
+      }
+      return [new LabelClass({
+        labelExpressionInfo: { expression: "$feature.dybde_m" },
+        labelPlacement: "center-along",
+        // Samme grense som webkartet: etikettene kommer fra 1:40 000 og innover
+        minScale: 40001,
+        symbol: symbol
+      })];
+    }
+
+    // Samme klassegrenser som webkartet, men farger som synes på lys bakgrunn
+    const DYBDE_FARGER_LYS = [[95, 150, 170], [60, 135, 185], [40, 105, 180], [35, 75, 165], [25, 45, 125]];
+
+    function dybdeRendererLys(json) {
+      const lys = JSON.parse(JSON.stringify(json));
+      lys.visualVariables = [];
+      (lys.classBreakInfos || []).forEach(function (info, i) {
+        const c = DYBDE_FARGER_LYS[Math.min(i, DYBDE_FARGER_LYS.length - 1)];
+        info.symbol.color = c.concat([255]);
+        info.symbol.width = 1;
+      });
+      return rendererJsonUtils.fromJSON(lys);
+    }
+
+    function applyDybdeStil() {
+      if (!layerRefs.nve || !dybdeStil.lys) return;
+      const stil = BASEMAPS[currentBasemap].light ? dybdeStil.lys : dybdeStil.mork;
+      layerRefs.nve.renderer = stil.renderer;
+      layerRefs.nve.labelingInfo = stil.labels;
+    }
+
     // ---------------- Alle datalag ----------------
     function addDataLayers(symbologi) {
       layerRefs.papirkart = buildPapirkartLayer();
 
+      dybdeStil.mork = {
+        renderer: rendererJsonUtils.fromJSON(symbologi.dybde),
+        labels: dybdeLabels([255, 255, 255, 1], null)
+      };
+      dybdeStil.lys = { renderer: dybdeRendererLys(symbologi.dybde), labels: dybdeLabels([20, 55, 110, 1], [255, 255, 255, 0.9]) };
+
+      const stil = BASEMAPS[currentBasemap].light ? dybdeStil.lys : dybdeStil.mork;
       layerRefs.nve = new GeoJSONLayer({
         url: DATA.dybde,
         title: "Dybdekurver",
         minScale: 686967,
         visible: document.getElementById("toggle-nve").checked,
-        renderer: rendererJsonUtils.fromJSON(symbologi.dybde),
-        labelingInfo: [new LabelClass({
-          labelExpressionInfo: { expression: "$feature.dybde_m" },
-          labelPlacement: "center-along",
-          // Samme grense som webkartet: etikettene kommer fra 1:40 000 og innover
-          minScale: 40001,
-          symbol: {
-            type: "text",
-            color: [255, 255, 255, 1],
-            font: { family: "Arial", size: 12.5 }
-          }
-        })]
+        // Feltene oppgis, så laget slipper å utlede dem fra hele filen
+        fields: [{ name: "dybde_m", type: "double" }],
+        outFields: ["dybde_m"],
+        renderer: stil.renderer,
+        labelingInfo: stil.labels
       });
 
       layerRefs.samferdsel = buildSamferdselLayer();
@@ -1572,10 +1644,14 @@
     });
 
     basemapList.addEventListener("change", function (e) {
-      const bm = BASEMAPS[parseInt(e.target.value, 10)];
+      const index = parseInt(e.target.value, 10);
+      const bm = BASEMAPS[index];
       if (!bm) return;
       const newBasemap = buildBasemap(bm);
-      if (newBasemap) map.basemap = newBasemap;
+      if (!newBasemap) return;
+      map.basemap = newBasemap;
+      currentBasemap = index;
+      applyDybdeStil();
     });
 
     // ---------------- Zoom til min posisjon ----------------

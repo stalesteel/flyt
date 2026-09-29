@@ -92,9 +92,16 @@ Forskjeller fra hovedkartet:
   for å vise hvilken side båten skal kjøre på. Linjene er lagret fra sør mot nord, så
   vest er alltid venstre side av linjen.
 - **Samferdsel er hentet ut som filer**, så kartet ikke venter på en karttjeneste for
-  hver panorering. Det meste tas med inntil 1 km utenfor interesseområdet, og europa-,
-  riks- og fylkesveier inntil 20 km. Hvert objekt har feltet `fade` (0–1), og lagene tones
-  ut mot yttergrensen i stedet for å kuttes. Avstandene står øverst i `bygg_data.py`.
+  hver panorering. Alt tas med inntil 1 km utenfor interesseområdet. Hvert objekt har
+  feltet `fade` (0–1), og lagene tones ut mot yttergrensen i stedet for å kuttes.
+- **Samferdsel tynnes ut etter zoom**, målt på den lengste leden av kartbildet:
+  hovedveier (europa-, riks- og fylkesveg) vises alltid, øvrige veier, traktorveier og
+  anleggsveier når kartbildet dekker høyst 4 km, og parkering, buss og tog høyst 10 km.
+  Grensene står øverst i `lab/index.html` (`SAMFERDSEL_VEG_KM`, `SAMFERDSEL_PUNKT_KM`).
+  Fortau, gangfelt, trapper og stier er utelatt.
+- **Dybdekurvene har egen fargebruk på lyse bakgrunnskart** (Gråtone og Basis terreng):
+  mørkere blåtoner og mørke tall med hvit halo. På flyfoto brukes webkartets farger.
+  Kurvene er delt i biter på høyst 1,5 km, som tegnes og etiketteres raskere.
 
 ### Hvor dataene kommer fra
 
@@ -102,7 +109,7 @@ Forskjeller fra hovedkartet:
 |---|---|---|
 | `data/interesseomrade.geojson` | Området som ikke dimmes | NVE Innsjødatabase og Elvenett |
 | `data/dybdekurver.geojson` | Dybdekurver | NVE Innsjødatabase |
-| `data/samferdsel/*.geojson` | Veier, traktorveier, parkering, buss og tog. `stor_veg` er de store veiene langt ut | GeomapSamferdsel (GeodataOnline) |
+| `data/samferdsel/*.geojson` | Veier, traktorveier, parkering, buss og tog. `hovedveg` er europa-, riks- og fylkesveier, `veg` resten | GeomapSamferdsel (GeodataOnline) |
 | `data/led.geojson` | Ledene | Kopi av `LedOyeren` i AGOL |
 | `data/poi.geojson`, `data/poi-bilder/` | Interessepunkter med bilde | Kopi av `POI_Innsjo` i AGOL |
 | `data/symbologi.json` | Symbologi og startvisning | Kopi fra webkartet i AGOL |
