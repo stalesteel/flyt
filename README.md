@@ -1,6 +1,6 @@
 # Flyt
 
-Privat kart for bruk på Øyeren, med sjekklister for båten.
+Privat kart for bruk på Øyeren.
 Ligger på **GitHub Pages** og publiseres til <https://flyt.klommestein.no> automatisk
 når endringer pushes til `main`.
 
@@ -9,8 +9,20 @@ når endringer pushes til `main`.
 | Adresse | Hva det er |
 |---|---|
 | `/` | Kartet |
-| `/sjekkliste` | Sjekklistene (ikke lenket fra noe sted) |
-| `/sjekkliste/admin` | Redigering av sjekklistene (ikke lenket fra noe sted) |
+| `/sjekkliste` | Gammel sjekklistefunksjon — **utgått**, se under |
+
+## Gjenstår å rydde
+
+Sjekklistene er flyttet ut i en egen app på <https://husk.klommestein.no>, og knappene
+i kartmenyen peker dit. Følgende henger igjen og kan fjernes:
+
+1. **Mappen `sjekkliste/` i dette repoet.** Den er ikke lenket fra noe sted lenger, men
+   svarer fortsatt på direkte adresse. Trygt å slette — filene ligger i git-historikken.
+2. **ArcGIS-tabellen `SjekklisteFlyt`.** Denne slettingen kan ikke angres. Innholdet er
+   trygt uansett: alle 22 punktene ligger både i Husk og i `DESIGN.md` i husk-repoet.
+   Vent gjerne til Husk er prøvd noen ganger i praksis.
+3. **Avsnittet «Sjekklister» lenger ned i denne README-en**, som beskriver den gamle
+   løsningen, bør fjernes samtidig.
 
 ## Tilgangssperre
 
