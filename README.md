@@ -85,11 +85,16 @@ Forskjeller fra hovedkartet:
   og `lab/fliser/`, og siden bruker bare ArcGIS Maps SDK som kartmotor. Bakgrunnskartene
   kommer rett fra GeodataOnline, som før.
 - **Kartet dimmes utenfor interesseområdet**: Øyeren, Svelle, Glomma og Nitelva mellom
-  Lillestrøm, Sørumsand, Trøgstad og Solbergfoss, med 1 km buffer.
-- **Røde og grønne leder har halo**: rød halo på vestsiden, grønn på østsiden. Linjene er
-  lagret fra sør mot nord, så haloen kan legges til venstre eller høyre for linjen.
-- **Samferdsel er hentet ut som filer** og begrenset til interesseområdet, så kartet ikke
-  venter på en karttjeneste for hver panorering.
+  Lillestrøm, Sørumsand, Trøgstad og Solbergfoss, med 2 km buffer. Overgangen er myk:
+  dimmingen tegnes i flere trinn med hullet bufret stadig lenger ut. Styrke og bredde
+  styres med `DIM_OPACITY` og `DIM_FADE_*` øverst i `lab/index.html`.
+- **Alle leder unntatt kanoleden har to haloer**: rød på vestsiden og grønn på østsiden,
+  for å vise hvilken side båten skal kjøre på. Linjene er lagret fra sør mot nord, så
+  vest er alltid venstre side av linjen.
+- **Samferdsel er hentet ut som filer**, så kartet ikke venter på en karttjeneste for
+  hver panorering. Det meste tas med inntil 1 km utenfor interesseområdet, og europa-,
+  riks- og fylkesveier inntil 20 km. Hvert objekt har feltet `fade` (0–1), og lagene tones
+  ut mot yttergrensen i stedet for å kuttes. Avstandene står øverst i `bygg_data.py`.
 
 ### Hvor dataene kommer fra
 
@@ -97,7 +102,7 @@ Forskjeller fra hovedkartet:
 |---|---|---|
 | `data/interesseomrade.geojson` | Området som ikke dimmes | NVE Innsjødatabase og Elvenett |
 | `data/dybdekurver.geojson` | Dybdekurver | NVE Innsjødatabase |
-| `data/samferdsel/*.geojson` | Veier, traktorveier, parkering, buss og tog | GeomapSamferdsel (GeodataOnline) |
+| `data/samferdsel/*.geojson` | Veier, traktorveier, parkering, buss og tog. `stor_veg` er de store veiene langt ut | GeomapSamferdsel (GeodataOnline) |
 | `data/led.geojson` | Ledene | Kopi av `LedOyeren` i AGOL |
 | `data/poi.geojson`, `data/poi-bilder/` | Interessepunkter med bilde | Kopi av `POI_Innsjo` i AGOL |
 | `data/symbologi.json` | Symbologi og startvisning | Kopi fra webkartet i AGOL |
@@ -121,6 +126,6 @@ Samferdsel krever innlogging i GeodataOnline. Sett et token i miljøvariabelen
 Den forsvinner hvis AGOL-kontoen legges ned.
 
 Ledene og interessepunktene finnes foreløpig bare i AGOL. Når AGOL er borte, redigeres
-`led.geojson` og `poi.geojson` direkte, for eksempel i <https://geojson.io>. Røde og
-grønne ledlinjer må gå fra sør mot nord, ellers havner haloen på feil side.
+`led.geojson` og `poi.geojson` direkte, for eksempel i <https://geojson.io>. Ledlinjene
+(unntatt kanoleden) må gå fra sør mot nord, ellers bytter haloene side.
 

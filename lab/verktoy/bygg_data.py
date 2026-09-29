@@ -10,11 +10,13 @@ Kjøres fra repoets rot:
 Trinnene:
 
   omrade      Interesseområdet: Øyeren, Svelle, Glomma og Nitelva mellom
-              Lillestrøm, Sørumsand, Trøgstad og Solbergfoss, med 1 km buffer.
+              Lillestrøm, Sørumsand, Trøgstad og Solbergfoss, med 2 km buffer.
               Kilde: NVE (åpne tjenester).
   dybde       Dybdekurvene innenfor interesseområdet. Kilde: NVE.
-  samferdsel  Veier, parkering, holdeplasser og traktorveier innenfor
-              interesseområdet. Kilde: GeomapSamferdsel i GeodataOnline.
+  samferdsel  Veier, parkering, holdeplasser og traktorveier inntil 1 km utenfor
+              interesseområdet, og store veier inntil 20 km utenfor. Hvert
+              objekt får et felt "fade" (0–1) som tones ut mot yttergrensen.
+              Kilde: GeomapSamferdsel i GeodataOnline.
               Krever token i miljøvariabelen GDO_TOKEN. Uten token brukes
               proxyen som webkartet i AGOL har lagret innloggingen i.
   agol        Led, interessepunkter med bilder og symbologien fra webkartet.
@@ -36,7 +38,7 @@ import urllib.request
 
 from pyproj import Transformer
 from shapely.geometry import LineString, MultiLineString, Point, Polygon, mapping, shape
-from shapely.ops import transform, unary_union
+from shapely.ops import linemerge, transform, unary_union
 
 ROT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 DATA = os.path.join(ROT, "data")
@@ -51,6 +53,16 @@ AGOL_PROXY_SAMFERDSEL = ("https://utility.arcgis.com/usrsvcs/servers/fad9153bb5e
 
 til_utm = Transformer.from_crs(4326, 25833, always_xy=True).transform
 til_wgs = Transformer.from_crs(25833, 4326, always_xy=True).transform
+
+# Avstand fra vannet til kanten av interesseområdet
+OMRADE_BUFFER_M = 2000
+
+# Samferdsel tas med et stykke utenfor interesseområdet og fades ut mot
+# kanten, så det ikke blir en hard grense. Avstandene er fra interesseområdet.
+SAMFERDSEL_FADE_M = (0, 1000)          # full styrke ved kanten, borte etter 1 km
+STOR_VEG_FADE_M = (10000, 20000)       # store veier: full til 10 km, borte etter 20 km
+STOR_VEG_KATEGORI = ("E", "R", "F")    # Europa-, riks- og fylkesveg
+STOR_VEG_TYPE = ("Enkel bilveg", "Kanalisert veg", "Rampe", "Rundkjøring")
 
 # Stedene som avgrenser vassdraget. Hjørnene i et firkantpolygon, i rekkefølge.
 AVGRENSNING = [
@@ -174,7 +186,7 @@ def bygg_omrade():
             vannflater.append(flate.intersection(avgrensning))
 
     vann = unary_union(vannflater + [elvelinjer.buffer(80)])
-    omrade = vann.buffer(1000, resolution=8).simplify(25)
+    omrade = vann.buffer(OMRADE_BUFFER_M, resolution=8).simplify(25)
     # Øyer og holmer inne i området skal heller ikke dimmes
     deler = [omrade] if omrade.geom_type == "Polygon" else list(omrade.geoms)
     omrade = unary_union([Polygon(p.exterior) for p in deler])
@@ -213,41 +225,128 @@ SAMFERDSEL = {
 }
 
 
+class Fade:
+    """Deler objekter i biter etter avstand fra interesseområdet og gir hver bit
+    en styrke fra 1 (innenfor start) til 0 (ved slutt)."""
+
+    def __init__(self, omrade, start, slutt, steg):
+        self.start, self.slutt = start, slutt
+        self.full = omrade.buffer(start).simplify(10) if start else omrade
+        self.ytre = omrade.buffer(slutt).simplify(20)
+        grenser = [start + (slutt - start) * i / steg for i in range(steg + 1)]
+        self.baand = []
+        indre = self.full
+        for d0, d1 in zip(grenser, grenser[1:]):
+            ytre = omrade.buffer(d1).simplify(15)
+            # Styrken midt i båndet
+            self.baand.append((ytre.difference(indre), 1 - ((d0 + d1) / 2 - start) / (slutt - start)))
+            indre = ytre
+
+    def del_opp(self, geom):
+        """Gir [(geometri, styrke)]."""
+        if self.full.contains(geom):
+            return [(geom, 1.0)]
+        if geom.geom_type == "Point":
+            if self.full.contains(geom):
+                return [(geom, 1.0)]
+            for baand, styrke in self.baand:
+                if baand.contains(geom):
+                    return [(geom, styrke)]
+            return []
+        biter = []
+        inne = geom.intersection(self.full)
+        if not inne.is_empty:
+            biter.append((inne, 1.0))
+        for baand, styrke in self.baand:
+            if not baand.intersects(geom):
+                continue
+            bit = geom.intersection(baand)
+            # Bare linjebiter; punkter der linjen bare berører et bånd hoppes over
+            if bit.geom_type == "GeometryCollection":
+                bit = unary_union([g for g in bit.geoms if g.geom_type in ("LineString", "MultiLineString")])
+            if not bit.is_empty and bit.length > 0.5:
+                biter.append((bit, styrke))
+        return biter
+
+
+def hent_samferdsel(base, token, lag_id, felt, flate, where="1=1"):
+    return spor_alle(f"{base}/{lag_id}", dict(
+        geometry=omrade_som_esri(flate), geometryType="esriGeometryPolygon", inSR=25833,
+        spatialRel="esriSpatialRelIntersects", outFields=",".join(felt), where=where,
+        maxAllowableOffset=0.5), token)
+
+
+def fadede_features(features, felt, fade, filter=None, slaa_sammen=False, forenkle=0):
+    """GeoJSON-features med feltet fade. slaa_sammen kobler linjebiter med like
+    egenskaper til lengre linjer, som gir langt færre objekter og mindre filer."""
+    grupper = {}
+    ut = []
+    for f in features:
+        geom = esri_til_shapely(f["geometry"])
+        if geom is None or geom.is_empty:
+            continue
+        a = f["attributes"]
+        if filter and not filter(a):
+            continue
+        egenskaper = {k: v for k, v in a.items() if k in felt and v not in (None, "")}
+        for bit, styrke in fade.del_opp(geom):
+            if styrke < 0.03:
+                continue
+            e = dict(egenskaper, fade=round(styrke, 2))
+            if slaa_sammen:
+                grupper.setdefault(json.dumps(e, sort_keys=True, ensure_ascii=False), []).append(bit)
+            else:
+                # 5 desimaler er rundt en meter, godt nok for veier og punkter
+                ut.append(som_feature(bit, e, 5))
+
+    for nokkel, biter in grupper.items():
+        e = json.loads(nokkel)
+        linjer = linemerge(unary_union(biter))
+        if forenkle:
+            linjer = linjer.simplify(forenkle)
+        for linje in (linjer.geoms if hasattr(linjer, "geoms") else [linjer]):
+            if linje.length > 0.5:
+                ut.append(som_feature(linje, e, 5))
+    return ut
+
+
 def bygg_samferdsel():
     print("Samferdsel")
     token = os.environ.get("GDO_TOKEN")
     base = GDO_SAMFERDSEL if token else AGOL_PROXY_SAMFERDSEL
     print("  kilde:", "GeodataOnline med token" if token else "AGOL-proxyen (sett GDO_TOKEN for å gå direkte)")
     omrade = les_omrade()
+
+    naer = Fade(omrade, *SAMFERDSEL_FADE_M, steg=10)
     for navn, (lag_id, felt) in SAMFERDSEL.items():
-        features = spor_alle(f"{base}/{lag_id}", dict(
-            geometry=omrade_som_esri(omrade), geometryType="esriGeometryPolygon", inSR=25833,
-            spatialRel="esriSpatialRelIntersects", outFields=",".join(felt),
-            maxAllowableOffset=0.5), token)
-        ut = []
-        for f in features:
-            geom = esri_til_shapely(f["geometry"])
-            if geom is None or geom.is_empty:
-                continue
-            egenskaper = {k: v for k, v in f["attributes"].items() if k in felt and v not in (None, "")}
-            # 5 desimaler er rundt en meter, godt nok for veier og punkter
-            ut.append(som_feature(geom, egenskaper, 5))
-        skriv_geojson(os.path.join(DATA, "samferdsel", navn + ".geojson"), ut)
+        features = hent_samferdsel(base, token, lag_id, felt, naer.ytre)
+        # De store veiene ligger i et eget lag som når mye lenger ut
+        filter = (lambda a: a.get("vegkategori") not in STOR_VEG_KATEGORI) if navn == "veg" else None
+        linjelag = navn in ("veg", "traktorveg", "anleggsveg")
+        skriv_geojson(os.path.join(DATA, "samferdsel", navn + ".geojson"),
+                      fadede_features(features, felt, naer, filter, slaa_sammen=linjelag, forenkle=1.5))
+
+    fjern = Fade(omrade, *STOR_VEG_FADE_M, steg=20)
+    where = "vegkategori in ({}) and typeveg in ({})".format(
+        ",".join(f"'{k}'" for k in STOR_VEG_KATEGORI), ",".join(f"'{t}'" for t in STOR_VEG_TYPE))
+    features = hent_samferdsel(base, token, 21, ["vegkategori"], fjern.ytre.simplify(200), where)
+    skriv_geojson(os.path.join(DATA, "samferdsel", "stor_veg.geojson"),
+                  fadede_features(features, ["vegkategori"], fjern, slaa_sammen=True, forenkle=3))
 
 
 def bygg_agol():
     print("Led, interessepunkter og symbologi fra AGOL")
     from PIL import Image, ImageOps
 
-    # Led: røde og grønne linjer snus så de går fra sør mot nord. Da ligger
-    # vest alltid til venstre og øst til høyre, og haloen kan forskyves til
-    # riktig side med en vanlig venstre/høyre-forskyvning.
+    # Led: alle linjer unntatt kanoleden snus så de går fra sør mot nord. Da
+    # ligger vest alltid til venstre og øst til høyre, og haloene (rød mot vest,
+    # grønn mot øst) kan forskyves med en vanlig venstre/høyre-forskyvning.
     led = spor_alle(AGOL + "/LedOyeren/FeatureServer/1", dict(outFields="Led,Hastighet,Info", oidFelt="OBJECTID"))
     ut = []
     for f in led:
         geom = esri_til_shapely(f["geometry"])
         a = f["attributes"]
-        if a["Led"] in (1, 2) and geom.geom_type == "LineString" and geom.coords[0][1] > geom.coords[-1][1]:
+        if a["Led"] != 4 and geom.geom_type == "LineString" and geom.coords[0][1] > geom.coords[-1][1]:
             geom = LineString(list(geom.coords)[::-1])
         ut.append(som_feature(geom, {k: a[k] for k in ("Led", "Hastighet", "Info") if a.get(k) is not None}))
     skriv_geojson(os.path.join(DATA, "led.geojson"), ut)

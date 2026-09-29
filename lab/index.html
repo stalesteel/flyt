@@ -596,8 +596,13 @@
     samferdsel: "data/samferdsel/"
   };
 
-  // Hvor mørkt kartet blir utenfor interesseområdet (0–1)
-  const DIM_OPACITY = 0.45;
+  // Hvor mørkt kartet blir utenfor interesseområdet (0–1), og overgangen:
+  // dimmingen begynner DIM_FADE_START meter innenfor kanten av området og
+  // er full DIM_FADE_END meter utenfor, fordelt på DIM_FADE_STEPS trinn.
+  const DIM_OPACITY = 0.62;
+  const DIM_FADE_START = -400;
+  const DIM_FADE_END = 1200;
+  const DIM_FADE_STEPS = 12;
 
   // Synligheten i Samferdsel styres på kartbildets høyde i kilometer, ikke
   // målestokk, som ville variert med skjermhøyden.
@@ -1018,6 +1023,7 @@
     "esri/geometry/geometryEngine",
     "esri/geometry/operators/projectOperator",
     "esri/geometry/operators/offsetOperator",
+    "esri/geometry/operators/bufferOperator",
     "esri/layers/GraphicsLayer",
     "esri/layers/GeoJSONLayer",
     "esri/layers/GroupLayer",
@@ -1029,7 +1035,7 @@
     "esri/renderers/support/jsonUtils",
     "esri/layers/support/LabelClass",
     "esri/core/reactiveUtils"
-  ], function (EsriMap, MapView, Graphic, Point, Extent, Polyline, Polygon, geometryEngine, projectOperator, offsetOperator, GraphicsLayer, GeoJSONLayer,
+  ], function (EsriMap, MapView, Graphic, Point, Extent, Polyline, Polygon, geometryEngine, projectOperator, offsetOperator, bufferOperator, GraphicsLayer, GeoJSONLayer,
                GroupLayer, TileLayer, VectorTileLayer, WebTileLayer, TileInfo, Basemap, rendererJsonUtils,
                LabelClass, reactiveUtils) {
 
@@ -1098,9 +1104,11 @@
     clearInspectHighlight = function () { inspectGraphicsLayer.removeAll(); };
 
     // ---------------- Dimming utenfor interesseområdet ----------------
-    // Et stort rektangel med interesseområdet som hull, tegnet som én grafikk.
-    // (Som GeoJSONLayer ble et så stort polygon bare tegnet i enkelte fliser.)
-    // Området er lagret i WGS84 og projiseres til kartets UTM33 her.
+    // Et stort rektangel med interesseområdet som hull. For å få en myk kant
+    // tegnes det flere ganger, hver gang med hullet bufret litt lenger ut og
+    // med svak farge. Der alle lagene overlapper, blir det DIM_OPACITY mørkt.
+    // (Som GeoJSONLayer ble et så stort polygon bare tegnet i enkelte fliser,
+    // derfor grafikk.) Området er lagret i WGS84 og projiseres til UTM33 her.
     function buildDimLayer(omrade) {
       const geom = omrade.features[0].geometry;
       const polygons = geom.type === "Polygon" ? [geom.coordinates] : geom.coordinates;
@@ -1116,15 +1124,23 @@
         // (origo -2 500 000, 9 045 984). Går polygonet forbi origo, feiler
         // flisene over. Ytre ring med klokka og hull mot klokka, slik Esri vil ha det.
         const outer = [[-2400000, 5000000], [-2400000, 9000000], [3000000, 9000000], [3000000, 5000000], [-2400000, 5000000]];
-        const holeRings = projected.rings.map(function (ring) {
-          return ringIsClockwise(ring) ? ring.slice().reverse() : ring;
-        });
 
-        const layer = new GraphicsLayer({ title: "Dimming", opacity: DIM_OPACITY });
-        layer.add(new Graphic({
-          geometry: new Polygon({ rings: [outer].concat(holeRings), spatialReference: { wkid: 25833 } }),
-          symbol: { type: "simple-fill", color: [12, 18, 24, 1], outline: { color: [0, 0, 0, 0], width: 0 } }
-        }));
+        // Hvert trinn dekker 1 - (1 - a)^n når n trinn overlapper
+        const stepAlpha = 1 - Math.pow(1 - DIM_OPACITY, 1 / DIM_FADE_STEPS);
+        const layer = new GraphicsLayer({ title: "Dimming" });
+
+        for (let i = 0; i < DIM_FADE_STEPS; i++) {
+          const distance = DIM_FADE_START + (DIM_FADE_END - DIM_FADE_START) * i / (DIM_FADE_STEPS - 1);
+          const hole = distance ? bufferOperator.execute(projected, distance) : projected;
+          if (!hole) continue;
+          const holeRings = hole.rings.map(function (ring) {
+            return ringIsClockwise(ring) ? ring.slice().reverse() : ring;
+          });
+          layer.add(new Graphic({
+            geometry: new Polygon({ rings: [outer].concat(holeRings), spatialReference: { wkid: 25833 } }),
+            symbol: { type: "simple-fill", color: [12, 18, 24, stepAlpha], outline: { color: [0, 0, 0, 0], width: 0 } }
+          }));
+        }
         return layer;
       });
     }
@@ -1166,21 +1182,22 @@
     }
 
     // ---------------- Led med halo ----------------
-    // Røde og grønne linjer er lagret fra sør mot nord (se bygg_data.py), så
-    // venstre side er vest og høyre side øst. Haloen er en bred, halvgjennom-
-    // siktig strek forskjøvet til sin side: rød mot vest, grønn mot øst.
+    // Hver led unntatt kanoleden får to haloer som viser hvilken side båten
+    // skal kjøre på: rød mot vest og grønn mot øst. Linjene er lagret fra sør
+    // mot nord (se bygg_data.py), så venstre side er vest og høyre side øst.
     //
     // Forskyvningen regnes ut her i meter for gjeldende zoom, slik at den
     // alltid er like mange piksler. CIM-symbolenes egen offset-effekt ble
     // regnet ut på grove fliser og havnet langt fra linjen ved høy zoom.
-    const HALO = {
-      1: { color: [255, 40, 40], side: -1 },   // Rød: venstre = vest
-      2: { color: [40, 220, 60], side: 1 }     // Grønn: høyre = øst
-    };
-    // Piksler fra linjens senter til haloens senter, og haloens bredde
+    const HALO_LEDS = [1, 2, 3];   // Rød, Grønn, Hvit — ikke Kanoled (4)
+    const HALO_SIDES = [
+      { color: [255, 50, 50], side: -1 },   // Rød: venstre = vest
+      { color: [50, 220, 70], side: 1 }     // Grønn: høyre = øst
+    ];
+    // Piksler fra linjens senter til haloens senter, bredde og styrke
     const HALO_STROKES = [
-      { offsetPx: 6, width: 6, alpha: 0.6 },
-      { offsetPx: 8, width: 12, alpha: 0.25 }
+      { offsetPx: 5, width: 4, alpha: 0.35 },
+      { offsetPx: 6.5, width: 8, alpha: 0.13 }
     ];
 
     const ledHaloLayer = new GraphicsLayer({ title: "Led-halo", minScale: 737281 });
@@ -1189,7 +1206,7 @@
 
     function loadLedLines() {
       const query = layerRefs.led.createQuery();
-      query.where = "Led IN (1, 2)";
+      query.where = "Led IN (" + HALO_LEDS.join(", ") + ")";
       query.returnGeometry = true;
       query.outFields = ["Led"];
       query.outSpatialReference = view.spatialReference;
@@ -1210,25 +1227,25 @@
 
       const graphics = [];
       ledLines.forEach(function (line) {
-        const halo = HALO[line.led];
-        if (!halo) return;
-        HALO_STROKES.forEach(function (stroke) {
-          // Kartet er i meter, så avstanden oppgis i meter. Negative verdier
-          // legger seg til venstre. (geometryEngine.offset ga null for enkelte
-          // linjer ved visse avstander, offsetOperator ikke.)
-          const distance = halo.side * stroke.offsetPx * view.resolution;
-          const geometry = offsetOperator.execute(line.geometry, distance, { joins: "round" });
-          if (!geometry) return;
-          graphics.push(new Graphic({
-            geometry: geometry,
-            symbol: {
-              type: "simple-line",
-              color: halo.color.concat([stroke.alpha]),
-              width: stroke.width * 0.75,   // punkter, ikke piksler
-              cap: "round",
-              join: "round"
-            }
-          }));
+        HALO_SIDES.forEach(function (halo) {
+          HALO_STROKES.forEach(function (stroke) {
+            // Kartet er i meter, så avstanden oppgis i meter. Negative verdier
+            // legger seg til venstre. (geometryEngine.offset ga null for enkelte
+            // linjer ved visse avstander, offsetOperator ikke.)
+            const distance = halo.side * stroke.offsetPx * view.resolution;
+            const geometry = offsetOperator.execute(line.geometry, distance, { joins: "round" });
+            if (!geometry) return;
+            graphics.push(new Graphic({
+              geometry: geometry,
+              symbol: {
+                type: "simple-line",
+                color: halo.color.concat([stroke.alpha]),
+                width: stroke.width * 0.75,   // punkter, ikke piksler
+                cap: "round",
+                join: "round"
+              }
+            }));
+          });
         });
       });
       ledHaloLayer.removeAll();
@@ -1240,28 +1257,33 @@
       return { type: "picture-marker", url: "data:image/png;base64," + base64, width: size, height: size };
     }
 
+    // Veirenderer for både de nære veiene og de store veiene langt ute
+    const VEG_RENDERER = {
+      type: "unique-value",
+      field: "vegkategori",
+      defaultSymbol: { type: "simple-line", color: [156, 156, 156, 1], width: 2 },
+      uniqueValueInfos: [
+        { value: "P", label: "Privat veg", symbol: { type: "simple-line", color: [156, 156, 156, 1], width: 2 } },
+        { value: "S", label: "Skogsbilveg", symbol: { type: "simple-line", color: [156, 156, 156, 1], width: 2.27 } },
+        { value: "K", label: "Kommunalveg", symbol: { type: "simple-line", color: [104, 138, 228, 1], width: 2.83 } },
+        { value: "F", label: "Fylkesveg", symbol: { type: "simple-line", color: [255, 170, 0, 1], width: 3 } },
+        { value: "R", label: "Riksveg", symbol: { type: "simple-line", color: [230, 152, 0, 1], width: 3 } },
+        { value: "E", label: "Europaveg", symbol: { type: "simple-line", color: [255, 85, 0, 1], width: 3 } }
+      ]
+    };
+
+    // Alle samferdselsobjekter har feltet fade (0–1), som toner dem ut mot
+    // yttergrensen i stedet for å kutte dem hardt av (se bygg_data.py)
+    const FADE_VV = { type: "opacity", field: "fade", stops: [{ value: 0, opacity: 0 }, { value: 1, opacity: 1 }] };
+
     // Sublagene fra GeomapSamferdsel, med symbologien fra tjenesten og
-    // webkartets overstyringer (størrelser og traktorveifarge).
+    // webkartets overstyringer (størrelser og traktorveifarge). stor_veg er
+    // europa-, riks- og fylkesveier inntil 20 km ut; veg er resten.
     // near: vises når kartbildet er lavere enn SAMFERDSEL_NEAR_KM,
     // closest: vises når det er lavere enn SAMFERDSEL_CLOSEST_KM.
     const SAMFERDSEL_LAYERS = [
-      {
-        key: "veg",
-        range: "always",
-        renderer: {
-          type: "unique-value",
-          field: "vegkategori",
-          defaultSymbol: { type: "simple-line", color: [156, 156, 156, 1], width: 2 },
-          uniqueValueInfos: [
-            { value: "P", label: "Privat veg", symbol: { type: "simple-line", color: [156, 156, 156, 1], width: 2 } },
-            { value: "S", label: "Skogsbilveg", symbol: { type: "simple-line", color: [156, 156, 156, 1], width: 2.27 } },
-            { value: "K", label: "Kommunalveg", symbol: { type: "simple-line", color: [104, 138, 228, 1], width: 2.83 } },
-            { value: "F", label: "Fylkesveg", symbol: { type: "simple-line", color: [255, 170, 0, 1], width: 3 } },
-            { value: "R", label: "Riksveg", symbol: { type: "simple-line", color: [230, 152, 0, 1], width: 3 } },
-            { value: "E", label: "Europaveg", symbol: { type: "simple-line", color: [255, 85, 0, 1], width: 3 } }
-          ]
-        }
-      },
+      { key: "stor_veg", range: "always", renderer: VEG_RENDERER },
+      { key: "veg", range: "always", renderer: VEG_RENDERER },
       {
         key: "traktorveg",
         range: "closest",
@@ -1293,7 +1315,7 @@
           url: DATA.samferdsel + def.key + ".geojson",
           title: def.key,
           outFields: ["*"],
-          renderer: def.renderer,
+          renderer: Object.assign({}, def.renderer, { visualVariables: [FADE_VV] }),
           visible: def.range === "always"
         });
         samferdselByLayer.set(layer, def);
