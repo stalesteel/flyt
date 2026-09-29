@@ -1,0 +1,1556 @@
+{
+ "led": {
+  "authoringInfo": {
+   "colorRamp": {
+    "type": "multipart",
+    "colorRamps": [
+     {
+      "type": "algorithmic",
+      "algorithm": "esriCIELabAlgorithm",
+      "fromColor": [
+       179,
+       233,
+       252,
+       255
+      ],
+      "toColor": [
+       179,
+       233,
+       252,
+       255
+      ]
+     },
+     {
+      "type": "algorithmic",
+      "algorithm": "esriCIELabAlgorithm",
+      "fromColor": [
+       233,
+       252,
+       179,
+       255
+      ],
+      "toColor": [
+       233,
+       252,
+       179,
+       255
+      ]
+     },
+     {
+      "type": "algorithmic",
+      "algorithm": "esriCIELabAlgorithm",
+      "fromColor": [
+       252,
+       179,
+       189,
+       255
+      ],
+      "toColor": [
+       252,
+       179,
+       189,
+       255
+      ]
+     },
+     {
+      "type": "algorithmic",
+      "algorithm": "esriCIELabAlgorithm",
+      "fromColor": [
+       218,
+       182,
+       252,
+       255
+      ],
+      "toColor": [
+       218,
+       182,
+       252,
+       255
+      ]
+     },
+     {
+      "type": "algorithmic",
+      "algorithm": "esriCIELabAlgorithm",
+      "fromColor": [
+       184,
+       252,
+       223,
+       255
+      ],
+      "toColor": [
+       184,
+       252,
+       223,
+       255
+      ]
+     },
+     {
+      "type": "algorithmic",
+      "algorithm": "esriCIELabAlgorithm",
+      "fromColor": [
+       252,
+       227,
+       197,
+       255
+      ],
+      "toColor": [
+       252,
+       227,
+       197,
+       255
+      ]
+     },
+     {
+      "type": "algorithmic",
+      "algorithm": "esriCIELabAlgorithm",
+      "fromColor": [
+       252,
+       215,
+       249,
+       255
+      ],
+      "toColor": [
+       252,
+       215,
+       249,
+       255
+      ]
+     },
+     {
+      "type": "algorithmic",
+      "algorithm": "esriCIELabAlgorithm",
+      "fromColor": [
+       184,
+       252,
+       179,
+       255
+      ],
+      "toColor": [
+       184,
+       252,
+       179,
+       255
+      ]
+     },
+     {
+      "type": "algorithmic",
+      "algorithm": "esriCIELabAlgorithm",
+      "fromColor": [
+       252,
+       179,
+       227,
+       255
+      ],
+      "toColor": [
+       252,
+       179,
+       227,
+       255
+      ]
+     },
+     {
+      "type": "algorithmic",
+      "algorithm": "esriCIELabAlgorithm",
+      "fromColor": [
+       207,
+       208,
+       252,
+       255
+      ],
+      "toColor": [
+       207,
+       208,
+       252,
+       255
+      ]
+     },
+     {
+      "type": "algorithmic",
+      "algorithm": "esriCIELabAlgorithm",
+      "fromColor": [
+       232,
+       252,
+       212,
+       255
+      ],
+      "toColor": [
+       232,
+       252,
+       212,
+       255
+      ]
+     },
+     {
+      "type": "algorithmic",
+      "algorithm": "esriCIELabAlgorithm",
+      "fromColor": [
+       202,
+       252,
+       247,
+       255
+      ],
+      "toColor": [
+       202,
+       252,
+       247,
+       255
+      ]
+     },
+     {
+      "type": "algorithmic",
+      "algorithm": "esriCIELabAlgorithm",
+      "fromColor": [
+       252,
+       210,
+       216,
+       255
+      ],
+      "toColor": [
+       252,
+       210,
+       216,
+       255
+      ]
+     }
+    ]
+   }
+  },
+  "type": "uniqueValue",
+  "field1": "Led",
+  "defaultLabel": "",
+  "defaultSymbol": {
+   "type": "CIMSymbolReference",
+   "symbol": {
+    "type": "CIMLineSymbol",
+    "symbolLayers": [
+     {
+      "type": "CIMSolidStroke",
+      "enable": true,
+      "capStyle": "Round",
+      "joinStyle": "Round",
+      "lineStyle3D": "Strip",
+      "miterLimit": 10,
+      "width": 1,
+      "height3D": 1,
+      "anchor3D": "Center",
+      "color": [
+       130,
+       130,
+       130,
+       255
+      ]
+     }
+    ]
+   }
+  },
+  "fieldDelimiter": ",",
+  "uniqueValueGroups": [
+   {
+    "heading": "Led",
+    "classes": [
+     {
+      "description": "Rød",
+      "label": "Rød",
+      "symbol": {
+       "type": "CIMSymbolReference",
+       "symbol": {
+        "type": "CIMLineSymbol",
+        "symbolLayers": [
+         {
+          "type": "CIMSolidStroke",
+          "effects": [
+           {
+            "type": "CIMGeometricEffectDashes",
+            "dashTemplate": [
+             5,
+             5
+            ],
+            "lineDashEnding": "NoConstraint",
+            "controlPointEnding": "NoConstraint"
+           }
+          ],
+          "enable": true,
+          "name": "New_eccf7c4e-2f19-4fd0-9976-ba5cb3f0bceb",
+          "capStyle": "Round",
+          "joinStyle": "Round",
+          "lineStyle3D": "Strip",
+          "miterLimit": 10,
+          "width": 4,
+          "height3D": 1,
+          "anchor3D": "Center",
+          "color": [
+           255,
+           0,
+           0,
+           255
+          ]
+         },
+         {
+          "type": "CIMSolidStroke",
+          "enable": true,
+          "name": "New_593ba980-05d1-4d63-b157-f4f56a3dcaf3",
+          "colorLocked": true,
+          "capStyle": "Round",
+          "joinStyle": "Round",
+          "lineStyle3D": "Strip",
+          "miterLimit": 10,
+          "width": 4,
+          "height3D": 1,
+          "anchor3D": "Center",
+          "color": [
+           0,
+           0,
+           0,
+           0
+          ]
+         }
+        ]
+       }
+      },
+      "values": [
+       [
+        "1"
+       ]
+      ]
+     },
+     {
+      "description": "Grønn",
+      "label": "Grønn",
+      "symbol": {
+       "type": "CIMSymbolReference",
+       "symbol": {
+        "type": "CIMLineSymbol",
+        "symbolLayers": [
+         {
+          "type": "CIMSolidStroke",
+          "effects": [
+           {
+            "type": "CIMGeometricEffectDashes",
+            "dashTemplate": [
+             5,
+             5
+            ],
+            "lineDashEnding": "NoConstraint",
+            "controlPointEnding": "NoConstraint"
+           }
+          ],
+          "enable": true,
+          "capStyle": "Round",
+          "joinStyle": "Round",
+          "lineStyle3D": "Strip",
+          "miterLimit": 10,
+          "width": 4,
+          "height3D": 1,
+          "anchor3D": "Center",
+          "color": [
+           56,
+           168,
+           0,
+           255
+          ]
+         }
+        ]
+       }
+      },
+      "values": [
+       [
+        "2"
+       ]
+      ]
+     },
+     {
+      "description": "Hvit",
+      "label": "Hvit",
+      "symbol": {
+       "type": "CIMSymbolReference",
+       "symbol": {
+        "type": "CIMLineSymbol",
+        "symbolLayers": [
+         {
+          "type": "CIMSolidStroke",
+          "effects": [
+           {
+            "type": "CIMGeometricEffectDashes",
+            "dashTemplate": [
+             5,
+             5
+            ],
+            "lineDashEnding": "NoConstraint",
+            "controlPointEnding": "NoConstraint"
+           }
+          ],
+          "enable": true,
+          "name": "New_d06198b1-4f6a-4225-b2a3-b3b6785e8b2a",
+          "colorLocked": true,
+          "capStyle": "Round",
+          "joinStyle": "Round",
+          "lineStyle3D": "Strip",
+          "miterLimit": 10,
+          "width": 4,
+          "height3D": 1,
+          "anchor3D": "Center",
+          "color": [
+           255,
+           255,
+           255,
+           255
+          ]
+         },
+         {
+          "type": "CIMSolidStroke",
+          "effects": [
+           {
+            "type": "CIMGeometricEffectDashes",
+            "dashTemplate": [
+             5,
+             5
+            ],
+            "lineDashEnding": "NoConstraint",
+            "controlPointEnding": "NoConstraint"
+           }
+          ],
+          "enable": true,
+          "capStyle": "Round",
+          "joinStyle": "Round",
+          "lineStyle3D": "Strip",
+          "miterLimit": 4,
+          "width": 5,
+          "height3D": 1,
+          "anchor3D": "Center",
+          "color": [
+           0,
+           0,
+           0,
+           255
+          ]
+         }
+        ]
+       }
+      },
+      "values": [
+       [
+        "3"
+       ]
+      ]
+     },
+     {
+      "description": "Kanoled",
+      "label": "Kanoled",
+      "symbol": {
+       "type": "CIMSymbolReference",
+       "symbol": {
+        "type": "CIMLineSymbol",
+        "symbolLayers": [
+         {
+          "type": "CIMSolidStroke",
+          "effects": [
+           {
+            "type": "CIMGeometricEffectDashes",
+            "dashTemplate": [
+             2,
+             6
+            ],
+            "lineDashEnding": "NoConstraint",
+            "controlPointEnding": "NoConstraint"
+           }
+          ],
+          "enable": true,
+          "capStyle": "Round",
+          "joinStyle": "Round",
+          "lineStyle3D": "Strip",
+          "miterLimit": 10,
+          "width": 3,
+          "height3D": 1,
+          "anchor3D": "Center",
+          "color": [
+           255,
+           127,
+           127,
+           255
+          ]
+         }
+        ]
+       }
+      },
+      "values": [
+       [
+        "4"
+       ]
+      ]
+     }
+    ]
+   }
+  ],
+  "uniqueValueInfos": [
+   {
+    "description": "Rød",
+    "label": "Rød",
+    "symbol": {
+     "type": "CIMSymbolReference",
+     "symbol": {
+      "type": "CIMLineSymbol",
+      "symbolLayers": [
+       {
+        "type": "CIMSolidStroke",
+        "effects": [
+         {
+          "type": "CIMGeometricEffectDashes",
+          "dashTemplate": [
+           5,
+           5
+          ],
+          "lineDashEnding": "NoConstraint",
+          "controlPointEnding": "NoConstraint"
+         }
+        ],
+        "enable": true,
+        "name": "New_eccf7c4e-2f19-4fd0-9976-ba5cb3f0bceb",
+        "capStyle": "Round",
+        "joinStyle": "Round",
+        "lineStyle3D": "Strip",
+        "miterLimit": 10,
+        "width": 4,
+        "height3D": 1,
+        "anchor3D": "Center",
+        "color": [
+         255,
+         0,
+         0,
+         255
+        ]
+       },
+       {
+        "type": "CIMSolidStroke",
+        "enable": true,
+        "name": "New_593ba980-05d1-4d63-b157-f4f56a3dcaf3",
+        "colorLocked": true,
+        "capStyle": "Round",
+        "joinStyle": "Round",
+        "lineStyle3D": "Strip",
+        "miterLimit": 10,
+        "width": 4,
+        "height3D": 1,
+        "anchor3D": "Center",
+        "color": [
+         0,
+         0,
+         0,
+         0
+        ]
+       }
+      ]
+     }
+    },
+    "value": "1"
+   },
+   {
+    "description": "Grønn",
+    "label": "Grønn",
+    "symbol": {
+     "type": "CIMSymbolReference",
+     "symbol": {
+      "type": "CIMLineSymbol",
+      "symbolLayers": [
+       {
+        "type": "CIMSolidStroke",
+        "effects": [
+         {
+          "type": "CIMGeometricEffectDashes",
+          "dashTemplate": [
+           5,
+           5
+          ],
+          "lineDashEnding": "NoConstraint",
+          "controlPointEnding": "NoConstraint"
+         }
+        ],
+        "enable": true,
+        "capStyle": "Round",
+        "joinStyle": "Round",
+        "lineStyle3D": "Strip",
+        "miterLimit": 10,
+        "width": 4,
+        "height3D": 1,
+        "anchor3D": "Center",
+        "color": [
+         56,
+         168,
+         0,
+         255
+        ]
+       }
+      ]
+     }
+    },
+    "value": "2"
+   },
+   {
+    "description": "Hvit",
+    "label": "Hvit",
+    "symbol": {
+     "type": "CIMSymbolReference",
+     "symbol": {
+      "type": "CIMLineSymbol",
+      "symbolLayers": [
+       {
+        "type": "CIMSolidStroke",
+        "effects": [
+         {
+          "type": "CIMGeometricEffectDashes",
+          "dashTemplate": [
+           5,
+           5
+          ],
+          "lineDashEnding": "NoConstraint",
+          "controlPointEnding": "NoConstraint"
+         }
+        ],
+        "enable": true,
+        "name": "New_d06198b1-4f6a-4225-b2a3-b3b6785e8b2a",
+        "colorLocked": true,
+        "capStyle": "Round",
+        "joinStyle": "Round",
+        "lineStyle3D": "Strip",
+        "miterLimit": 10,
+        "width": 4,
+        "height3D": 1,
+        "anchor3D": "Center",
+        "color": [
+         255,
+         255,
+         255,
+         255
+        ]
+       },
+       {
+        "type": "CIMSolidStroke",
+        "effects": [
+         {
+          "type": "CIMGeometricEffectDashes",
+          "dashTemplate": [
+           5,
+           5
+          ],
+          "lineDashEnding": "NoConstraint",
+          "controlPointEnding": "NoConstraint"
+         }
+        ],
+        "enable": true,
+        "capStyle": "Round",
+        "joinStyle": "Round",
+        "lineStyle3D": "Strip",
+        "miterLimit": 4,
+        "width": 5,
+        "height3D": 1,
+        "anchor3D": "Center",
+        "color": [
+         0,
+         0,
+         0,
+         255
+        ]
+       }
+      ]
+     }
+    },
+    "value": "3"
+   },
+   {
+    "description": "Kanoled",
+    "label": "Kanoled",
+    "symbol": {
+     "type": "CIMSymbolReference",
+     "symbol": {
+      "type": "CIMLineSymbol",
+      "symbolLayers": [
+       {
+        "type": "CIMSolidStroke",
+        "effects": [
+         {
+          "type": "CIMGeometricEffectDashes",
+          "dashTemplate": [
+           2,
+           6
+          ],
+          "lineDashEnding": "NoConstraint",
+          "controlPointEnding": "NoConstraint"
+         }
+        ],
+        "enable": true,
+        "capStyle": "Round",
+        "joinStyle": "Round",
+        "lineStyle3D": "Strip",
+        "miterLimit": 10,
+        "width": 3,
+        "height3D": 1,
+        "anchor3D": "Center",
+        "color": [
+         255,
+         127,
+         127,
+         255
+        ]
+       }
+      ]
+     }
+    },
+    "value": "4"
+   }
+  ]
+ },
+ "poi": {
+  "type": "simple",
+  "symbol": {
+   "type": "CIMSymbolReference",
+   "symbol": {
+    "type": "CIMPointSymbol",
+    "symbolLayers": [
+     {
+      "type": "CIMVectorMarker",
+      "enable": true,
+      "colorLocked": true,
+      "anchorPoint": {
+       "x": 0,
+       "y": -13.125
+      },
+      "anchorPointUnits": "Absolute",
+      "dominantSizeAxis3D": "Y",
+      "size": 7.500000000000001,
+      "billboardMode3D": "FaceNearPlane",
+      "frame": {
+       "xmin": 0,
+       "ymin": 0,
+       "xmax": 84.3,
+       "ymax": 84.3
+      },
+      "markerGraphics": [
+       {
+        "type": "CIMMarkerGraphic",
+        "geometry": {
+         "rings": [
+          [
+           [
+            83.2,
+            32.5
+           ],
+           [
+            84.3,
+            40.7
+           ],
+           [
+            83.8,
+            48.9
+           ],
+           [
+            81.7,
+            56.9
+           ],
+           [
+            78.1,
+            64.3
+           ],
+           [
+            73,
+            70.9
+           ],
+           [
+            66.9,
+            76.4
+           ],
+           [
+            59.7,
+            80.5
+           ],
+           [
+            51.9,
+            83.2
+           ],
+           [
+            43.7,
+            84.3
+           ],
+           [
+            35.4,
+            83.8
+           ],
+           [
+            27.4,
+            81.7
+           ],
+           [
+            20,
+            78
+           ],
+           [
+            13.4,
+            73
+           ],
+           [
+            7.9,
+            66.8
+           ],
+           [
+            3.8,
+            59.7
+           ],
+           [
+            1.1,
+            51.9
+           ],
+           [
+            0,
+            43.7
+           ],
+           [
+            0.5,
+            35.4
+           ],
+           [
+            2.6,
+            27.4
+           ],
+           [
+            6.3,
+            20
+           ],
+           [
+            11.3,
+            13.4
+           ],
+           [
+            17.5,
+            7.9
+           ],
+           [
+            24.7,
+            3.8
+           ],
+           [
+            32.5,
+            1.1
+           ],
+           [
+            39.8,
+            0.1
+           ],
+           [
+            47.1,
+            0.3
+           ],
+           [
+            54.3,
+            1.8
+           ],
+           [
+            61.1,
+            4.5
+           ],
+           [
+            67.4,
+            8.4
+           ],
+           [
+            72.9,
+            13.3
+           ],
+           [
+            77.4,
+            19.1
+           ],
+           [
+            80.9,
+            25.5
+           ],
+           [
+            83.2,
+            32.5
+           ]
+          ]
+         ]
+        },
+        "symbol": {
+         "type": "CIMPolygonSymbol",
+         "symbolLayers": [
+          {
+           "type": "CIMSolidFill",
+           "enable": true,
+           "color": [
+            242,
+            242,
+            242,
+            255
+           ]
+          }
+         ]
+        }
+       }
+      ],
+      "scaleSymbolsProportionally": true,
+      "respectFrame": true,
+      "clippingPath": {
+       "type": "CIMClippingPath",
+       "clippingType": "Intersect",
+       "path": {
+        "rings": [
+         [
+          [
+           0,
+           0
+          ],
+          [
+           84.3,
+           0
+          ],
+          [
+           84.3,
+           84.3
+          ],
+          [
+           0,
+           84.3
+          ],
+          [
+           0,
+           0
+          ]
+         ]
+        ]
+       }
+      },
+      "rotation": 360,
+      "name": "Group 1"
+     },
+     {
+      "type": "CIMVectorMarker",
+      "enable": true,
+      "anchorPoint": {
+       "x": 0,
+       "y": -9.375
+      },
+      "anchorPointUnits": "Absolute",
+      "dominantSizeAxis3D": "Y",
+      "size": 18.75,
+      "billboardMode3D": "FaceNearPlane",
+      "frame": {
+       "xmin": 0,
+       "ymin": 0,
+       "xmax": 197.7,
+       "ymax": 294.7
+      },
+      "markerGraphics": [
+       {
+        "type": "CIMMarkerGraphic",
+        "geometry": {
+         "rings": [
+          [
+           [
+            98.9,
+            0
+           ],
+           [
+            119.4,
+            23.2
+           ],
+           [
+            139.4,
+            49.3
+           ],
+           [
+            156.8,
+            75.2
+           ],
+           [
+            171.2,
+            100.8
+           ],
+           [
+            182.4,
+            125.3
+           ],
+           [
+            190.6,
+            148.8
+           ],
+           [
+            195.7,
+            171.4
+           ],
+           [
+            197.7,
+            192.9
+           ],
+           [
+            197.7,
+            195.8
+           ],
+           [
+            197.7,
+            200.3
+           ],
+           [
+            197.6,
+            202.5
+           ],
+           [
+            197.5,
+            204.8
+           ],
+           [
+            197.3,
+            207.1
+           ],
+           [
+            197,
+            209.4
+           ],
+           [
+            196.7,
+            211.7
+           ],
+           [
+            196.4,
+            214.1
+           ],
+           [
+            196,
+            216.4
+           ],
+           [
+            195.5,
+            218.7
+           ],
+           [
+            195,
+            221.1
+           ],
+           [
+            194.4,
+            223.4
+           ],
+           [
+            193.7,
+            225.8
+           ],
+           [
+            193,
+            228.1
+           ],
+           [
+            192.2,
+            230.5
+           ],
+           [
+            191.4,
+            232.8
+           ],
+           [
+            190.5,
+            235.1
+           ],
+           [
+            189.5,
+            237.5
+           ],
+           [
+            188.5,
+            239.7
+           ],
+           [
+            187.4,
+            242
+           ],
+           [
+            186.2,
+            244.3
+           ],
+           [
+            185,
+            246.5
+           ],
+           [
+            183.7,
+            248.7
+           ],
+           [
+            182.4,
+            250.9
+           ],
+           [
+            181,
+            253.1
+           ],
+           [
+            179.5,
+            255.2
+           ],
+           [
+            178,
+            257.3
+           ],
+           [
+            176.4,
+            259.4
+           ],
+           [
+            174.7,
+            261.4
+           ],
+           [
+            173.1,
+            263.3
+           ],
+           [
+            171.3,
+            265.3
+           ],
+           [
+            169.5,
+            267.2
+           ],
+           [
+            167.7,
+            269
+           ],
+           [
+            165.8,
+            270.8
+           ],
+           [
+            163.9,
+            272.5
+           ],
+           [
+            161.9,
+            274.2
+           ],
+           [
+            159.9,
+            275.8
+           ],
+           [
+            157.8,
+            277.4
+           ],
+           [
+            155.7,
+            278.9
+           ],
+           [
+            153.6,
+            280.4
+           ],
+           [
+            151.4,
+            281.7
+           ],
+           [
+            149.2,
+            283.1
+           ],
+           [
+            147,
+            284.4
+           ],
+           [
+            144.8,
+            285.6
+           ],
+           [
+            142.5,
+            286.7
+           ],
+           [
+            140.3,
+            287.8
+           ],
+           [
+            138,
+            288.8
+           ],
+           [
+            135.7,
+            289.8
+           ],
+           [
+            133.4,
+            290.7
+           ],
+           [
+            131,
+            291.5
+           ],
+           [
+            128.7,
+            292.3
+           ],
+           [
+            126.4,
+            293
+           ],
+           [
+            124,
+            293.6
+           ],
+           [
+            121.7,
+            294.2
+           ],
+           [
+            119.4,
+            294.7
+           ],
+           [
+            117,
+            295.2
+           ],
+           [
+            114.7,
+            295.6
+           ],
+           [
+            112.4,
+            296
+           ],
+           [
+            110.1,
+            296.3
+           ],
+           [
+            107.8,
+            296.5
+           ],
+           [
+            105.5,
+            296.7
+           ],
+           [
+            103.3,
+            296.8
+           ],
+           [
+            101.1,
+            296.9
+           ],
+           [
+            98.8,
+            296.9
+           ],
+           [
+            83.1,
+            295.7
+           ],
+           [
+            67.8,
+            292
+           ],
+           [
+            53.3,
+            285.9
+           ],
+           [
+            39.9,
+            277.5
+           ],
+           [
+            28.1,
+            267.2
+           ],
+           [
+            18,
+            255.1
+           ],
+           [
+            10,
+            241.5
+           ],
+           [
+            4.2,
+            226.9
+           ],
+           [
+            0.9,
+            211.5
+           ],
+           [
+            0,
+            195.8
+           ],
+           [
+            0.1,
+            192.9
+           ],
+           [
+            2.1,
+            171.4
+           ],
+           [
+            7.2,
+            148.8
+           ],
+           [
+            15.4,
+            125.3
+           ],
+           [
+            26.6,
+            100.8
+           ],
+           [
+            41,
+            75.2
+           ],
+           [
+            58.4,
+            49.3
+           ],
+           [
+            78.4,
+            23.2
+           ],
+           [
+            98.9,
+            0
+           ]
+          ]
+         ]
+        },
+        "symbol": {
+         "type": "CIMPolygonSymbol",
+         "symbolLayers": [
+          {
+           "type": "CIMSolidFill",
+           "enable": true,
+           "color": [
+            0,
+            28,
+            240,
+            255
+           ]
+          }
+         ]
+        }
+       }
+      ],
+      "scaleSymbolsProportionally": true,
+      "respectFrame": true,
+      "clippingPath": {
+       "type": "CIMClippingPath",
+       "clippingType": "Intersect",
+       "path": {
+        "rings": [
+         [
+          [
+           0,
+           0
+          ],
+          [
+           197.7,
+           0
+          ],
+          [
+           197.7,
+           294.7
+          ],
+          [
+           0,
+           294.7
+          ],
+          [
+           0,
+           0
+          ]
+         ]
+        ]
+       }
+      },
+      "rotation": 360,
+      "name": "Group 1"
+     }
+    ],
+    "haloSize": 1,
+    "scaleX": 1,
+    "angleAlignment": "Display",
+    "angle": 360
+   },
+   "symbolName": "Group 1"
+  }
+ },
+ "poiEffekt": [
+  {
+   "type": "drop-shadow",
+   "xoffset": 0,
+   "yoffset": 0,
+   "blurRadius": 3,
+   "color": [
+    255,
+    255,
+    255,
+    255
+   ]
+  },
+  {
+   "type": "brightness",
+   "amount": 1.5
+  },
+  {
+   "type": "contrast",
+   "amount": 2
+  }
+ ],
+ "dybde": {
+  "authoringInfo": {
+   "type": "classedColor",
+   "visualVariables": [
+    {
+     "maxSliderValue": 100,
+     "minSliderValue": -2,
+     "type": "transparencyInfo"
+    }
+   ]
+  },
+  "type": "classBreaks",
+  "visualVariables": [
+   {
+    "type": "transparencyInfo",
+    "field": "dybde_m",
+    "stops": [
+     {
+      "transparency": 0,
+      "value": 0
+     },
+     {
+      "transparency": 50,
+      "value": 10
+     }
+    ]
+   }
+  ],
+  "classBreakInfos": [
+   {
+    "label": " -92.25 - 0.00",
+    "classMaxValue": 0,
+    "symbol": {
+     "type": "esriSLS",
+     "color": [
+      219,
+      242,
+      227,
+      255
+     ],
+     "width": 0.75,
+     "style": "esriSLSSolid"
+    }
+   },
+   {
+    "label": ">  0 - 1",
+    "classMaxValue": 1,
+    "symbol": {
+     "type": "esriSLS",
+     "color": [
+      197,
+      234,
+      212,
+      255
+     ],
+     "width": 0.75,
+     "style": "esriSLSSolid"
+    }
+   },
+   {
+    "label": ">  1 - 2",
+    "classMaxValue": 2,
+    "symbol": {
+     "type": "esriSLS",
+     "color": [
+      153,
+      185,
+      195,
+      255
+     ],
+     "width": 0.75,
+     "style": "esriSLSSolid"
+    }
+   },
+   {
+    "label": ">  2 - 3",
+    "classMaxValue": 3,
+    "symbol": {
+     "type": "esriSLS",
+     "color": [
+      111,
+      114,
+      178,
+      255
+     ],
+     "width": 0.75,
+     "style": "esriSLSSolid"
+    }
+   },
+   {
+    "label": ">  3 - 500",
+    "classMaxValue": 500,
+    "symbol": {
+     "type": "esriSLS",
+     "color": [
+      54,
+      65,
+      135,
+      255
+     ],
+     "width": 0.75,
+     "style": "esriSLSSolid"
+    }
+   }
+  ],
+  "field": "dybde_m",
+  "minValue": -92.25
+ },
+ "dybdeEtiketter": [
+  {
+   "name": "Default",
+   "deconflictionStrategy": "none",
+   "labelExpression": "[dybde_m]",
+   "labelPlacement": "esriServerLinePlacementCenterAlong",
+   "maxScale": 0,
+   "minScale": 40001,
+   "repeatLabel": false,
+   "repeatLabelDistance": 20,
+   "symbol": {
+    "type": "esriTS",
+    "color": [
+     255,
+     255,
+     255,
+     255
+    ],
+    "font": {
+     "family": "Arial",
+     "size": 12.499999999999998
+    },
+    "horizontalAlignment": "center",
+    "kerning": true,
+    "rightToLeft": false,
+    "rotated": false,
+    "text": "",
+    "verticalAlignment": "bottom",
+    "xoffset": 0,
+    "yoffset": 0,
+    "angle": 0
+   },
+   "useCodedValues": true
+  }
+ ],
+ "startvisning": {
+  "rotation": 2.8904936353454715,
+  "targetGeometry": {
+   "spatialReference": {
+    "latestWkid": 25833,
+    "wkid": 25833
+   },
+   "xmin": 285261.3960438154,
+   "ymin": 6633136.297330761,
+   "xmax": 289600.57138883276,
+   "ymax": 6636179.011749523
+  }
+ }
+}

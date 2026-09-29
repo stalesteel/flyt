@@ -9,6 +9,7 @@ når endringer pushes til `main`.
 | Adresse | Hva det er |
 |---|---|
 | `/` | Kartet |
+| `/lab` | Eksperimentell versjon uten ArcGIS Online og uten innlogging, se [Lab](#lab) |
 
 ## Gjenstår å rydde
 
@@ -20,7 +21,7 @@ Vent gjerne til Husk er prøvd noen ganger i praksis.
 
 ## Tilgangssperre
 
-Hele siden ligger bak en enkel innlogging: brukernavn **Tone**, passord **Berit**.
+Hovedkartet ligger bak en enkel innlogging (ikke `/lab`): brukernavn **Tone**, passord **Berit**.
 Store og små bokstaver spiller ingen rolle i brukernavnet; passordet må skrives nøyaktig.
 Innloggingen huskes i 90 dager i nettleseren.
 
@@ -71,3 +72,55 @@ Data lagres i disse tjenestene:
 
 Merk at bilde- og interessepunktlagene tar imot innsending fra hvem som helst som kommer
 gjennom innloggingen, uten videre autentisering mot ArcGIS.
+
+## Lab
+
+`/lab` er en eksperimentell versjon som skal kunne deles åpent med andre båtfolk på
+Øyeren. Hovedkartet på `/` er urørt og virker som før.
+
+Forskjeller fra hovedkartet:
+
+- **Ingen innlogging, bilder, sjekklister eller redigering av interessepunkter.**
+- **Ingen avhengighet til ArcGIS Online.** Alle kartdata ligger som filer i `lab/data/`
+  og `lab/fliser/`, og siden bruker bare ArcGIS Maps SDK som kartmotor. Bakgrunnskartene
+  kommer rett fra GeodataOnline, som før.
+- **Kartet dimmes utenfor interesseområdet**: Øyeren, Svelle, Glomma og Nitelva mellom
+  Lillestrøm, Sørumsand, Trøgstad og Solbergfoss, med 1 km buffer.
+- **Røde og grønne leder har halo**: rød halo på vestsiden, grønn på østsiden. Linjene er
+  lagret fra sør mot nord, så haloen kan legges til venstre eller høyre for linjen.
+- **Samferdsel er hentet ut som filer** og begrenset til interesseområdet, så kartet ikke
+  venter på en karttjeneste for hver panorering.
+
+### Hvor dataene kommer fra
+
+| Fil | Innhold | Kilde |
+|---|---|---|
+| `data/interesseomrade.geojson` | Området som ikke dimmes | NVE Innsjødatabase og Elvenett |
+| `data/dybdekurver.geojson` | Dybdekurver | NVE Innsjødatabase |
+| `data/samferdsel/*.geojson` | Veier, traktorveier, parkering, buss og tog | GeomapSamferdsel (GeodataOnline) |
+| `data/led.geojson` | Ledene | Kopi av `LedOyeren` i AGOL |
+| `data/poi.geojson`, `data/poi-bilder/` | Interessepunkter med bilde | Kopi av `POI_Innsjo` i AGOL |
+| `data/symbologi.json` | Symbologi og startvisning | Kopi fra webkartet i AGOL |
+| `fliser/papirkart/` | Papirkartet over naturreservatet | Kopi av `Nordre_Oyeren_tif` i AGOL |
+
+Alt er et øyeblikksbilde. Ingenting oppdateres av seg selv.
+
+### Oppdatere dataene
+
+Skriptet [`lab/verktoy/bygg_data.py`](lab/verktoy/bygg_data.py) henter alt på nytt.
+Det krever Python med `shapely`, `pyproj` og `pillow`.
+
+```bash
+python lab/verktoy/bygg_data.py omrade dybde samferdsel   # fra NVE og GeodataOnline
+python lab/verktoy/bygg_data.py agol                      # led, POI og symbologi fra AGOL
+python lab/verktoy/bygg_data.py papirkart                 # papirkartflisene fra AGOL
+```
+
+Samferdsel krever innlogging i GeodataOnline. Sett et token i miljøvariabelen
+`GDO_TOKEN`. Uten token brukes proxyen som webkartet i AGOL har lagret innloggingen i.
+Den forsvinner hvis AGOL-kontoen legges ned.
+
+Ledene og interessepunktene finnes foreløpig bare i AGOL. Når AGOL er borte, redigeres
+`led.geojson` og `poi.geojson` direkte, for eksempel i <https://geojson.io>. Røde og
+grønne ledlinjer må gå fra sør mot nord, ellers havner haloen på feil side.
+

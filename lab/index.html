@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Flyt lab</title>
+<link rel="stylesheet" href="https://js.arcgis.com/4.34/esri/themes/light/main.css">
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --surface: #ffffff;
+    --text: #1c1c1c;
+    --text-muted: #6b6b6b;
+    --border: #e2e2e0;
+    --accent: #2f6f4f;
+    --accent-hover: #255a40;
+    --error: #b3261e;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overflow: hidden;
+  }
+
+  #viewDiv {
+    position: fixed;
+    inset: 0;
+  }
+
+  [hidden] { display: none !important; }
+
+  /* ---------------- Floating buttons ---------------- */
+  .fab {
+    position: fixed;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    color: var(--text);
+  }
+
+  .fab svg { width: 22px; height: 22px; }
+
+  #info-btn { left: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); }
+
+  #measure-btn { left: 16px; bottom: 24px; }
+  #measure-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  #menu-btn { right: 16px; bottom: 24px; }
+
+  #locate-btn { right: 88px; bottom: 24px; }
+  #locate-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+
+  /* ---------------- Side menu ---------------- */
+  #menu-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.15);
+    z-index: 29;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  #menu-overlay.open { opacity: 1; pointer-events: auto; }
+
+  #side-menu {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 220px;
+    max-width: 72vw;
+    background: rgba(255,255,255,0.85);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+    backdrop-filter: blur(18px) saturate(160%);
+    z-index: 30;
+    box-shadow: -2px 0 16px rgba(0,0,0,0.12);
+    transform: translateX(104%);
+    transition: transform 0.22s ease;
+    overflow-y: auto;
+    padding: calc(16px + env(safe-area-inset-top, 0px)) 18px calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+  #side-menu.open { transform: translateX(0); }
+
+  /* Fallback for browsers without backdrop-filter support: keep it legible */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    #side-menu { background: rgba(255,255,255,0.97); }
+  }
+
+  .menu-section {
+    margin-bottom: 16px;
+  }
+  .menu-section:last-child { margin-bottom: 0; }
+
+  .menu-section .section-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+
+  .layer-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 0;
+    font-size: 0.94rem;
+    line-height: 1.25;
+    border-bottom: 1px solid var(--border);
+  }
+  .layer-row:last-child { border-bottom: none; }
+
+  .switch {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .track {
+    position: absolute;
+    inset: 0;
+    background: #cfcfcb;
+    border-radius: 24px;
+    transition: background 0.15s ease;
+    cursor: pointer;
+  }
+  .switch .track::before {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    left: 3px;
+    top: 3px;
+    background: #fff;
+    border-radius: 50%;
+    transition: transform 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  }
+  .switch input:checked + .track { background: var(--accent); }
+  .switch input:checked + .track::before { transform: translateX(18px); }
+
+  .basemap-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 0.94rem;
+    cursor: pointer;
+  }
+  .basemap-option input { accent-color: var(--accent); width: 17px; height: 17px; }
+
+  .menu-btn-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .menu-btn-row svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-muted); }
+  .menu-btn-row span { flex: 1 1 auto; min-width: 0; text-align: left; white-space: normal; line-height: 1.25; }
+
+  .menu-hint {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 8px;
+    line-height: 1.4;
+  }
+
+
+  #info-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 39;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  #info-overlay.open { opacity: 1; pointer-events: auto; }
+
+  #info-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 70vh;
+    background: var(--surface);
+    z-index: 40;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.2);
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    padding: 10px 18px 26px;
+  }
+  #info-sheet.open { transform: translateY(0); }
+
+  /* ---------------- Avstandsmåling ---------------- */
+  #measure-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 70vh;
+    background: var(--surface);
+    z-index: 40;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.2);
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    padding: 6px 18px calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+  #measure-sheet.open { transform: translateY(0); }
+  #measure-sheet .sheet-handle { margin: 4px auto 8px; }
+  #measure-sheet .sheet-header { margin-bottom: 10px; gap: 10px; }
+
+  .measure-restart, .sheet-action {
+    flex-shrink: 0;
+    padding: 7px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 9px;
+    background: var(--surface);
+    font-family: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+  }
+
+  .measure-readout {
+    display: flex;
+    gap: 16px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+  }
+  .measure-item { flex: 1; min-width: 0; }
+  .measure-label {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+  }
+  .measure-value {
+    display: block;
+    font-size: 1.3rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .speed-control { display: flex; align-items: center; gap: 12px; }
+  .speed-btn {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+    border: 1.5px solid var(--border);
+    border-radius: 11px;
+    background: var(--surface);
+    font-size: 1.35rem;
+    line-height: 1;
+    color: var(--text);
+    cursor: pointer;
+  }
+  .speed-btn:active { background: var(--bg); }
+  .speed-value {
+    flex: 1;
+    text-align: center;
+    font-size: 1.02rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .measure-hint { margin: 10px 0 0; text-align: center; }
+
+  .feature-kind {
+    margin: -4px 0 12px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .feature-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.93rem;
+  }
+  .feature-row:last-child { border-bottom: none; }
+  .feature-row .k { color: var(--text-muted); flex-shrink: 0; }
+  .feature-row .v { font-weight: 600; text-align: right; min-width: 0; }
+  .feature-empty { color: var(--text-muted); font-size: 0.92rem; }
+  .feature-line {
+    margin: 0 0 8px;
+    font-size: 0.98rem;
+    line-height: 1.5;
+  }
+  .feature-line:last-child { margin-bottom: 0; }
+
+  #poi-sheet, #poi-view-sheet, #feature-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 88vh;
+    background: var(--surface);
+    z-index: 40;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.2);
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    padding: 10px 18px calc(26px + env(safe-area-inset-bottom, 0px));
+  }
+  #poi-sheet.open, #poi-view-sheet.open, #feature-sheet.open { transform: translateY(0); }
+
+  .poi-view-image {
+    width: 100%;
+    border-radius: var(--radius);
+    display: block;
+    margin-bottom: 14px;
+  }
+  .poi-view-description {
+    margin: 0;
+    font-size: 0.98rem;
+    line-height: 1.55;
+    color: var(--text);
+    white-space: pre-wrap;
+  }
+  .poi-view-description:empty { display: none; }
+  .poi-view-description a {
+    color: var(--accent);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  #info-sheet .card p { margin: 0 0 12px; font-size: 0.92rem; line-height: 1.5; }
+  #info-sheet .card p:last-child { margin-bottom: 0; }
+  #info-sheet .card a { color: var(--accent); }
+
+  .sheet-handle {
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 4px;
+    margin: 6px auto 14px;
+  }
+
+  .sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .sheet-header h2 { font-size: 1.05rem; margin: 0; }
+  .close-btn {
+    background: none;
+    border: none;
+    font-size: 1.3rem;
+    line-height: 1;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  .field-label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+
+  /* ---------------- Lab ---------------- */
+  .lab-tag {
+    position: fixed;
+    left: 72px;
+    top: calc(26px + env(safe-area-inset-top, 0px));
+    z-index: 20;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.92);
+    border: 1px solid var(--border);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="viewDiv"></div>
+
+<!-- Floating controls -->
+<button class="fab" id="info-btn" aria-label="Om Flyt">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+</button>
+<span class="lab-tag">LAB</span>
+
+<button class="fab" id="measure-btn" aria-label="Mål avstand">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2.5 15.5L15.5 2.5l6 6-13 13z"></path>
+    <path d="M6 12l2 2M9 9l2 2M12 6l2 2"></path>
+  </svg>
+</button>
+
+<button class="fab" id="locate-btn" aria-label="Vis min posisjon">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
+</button>
+
+<button class="fab" id="menu-btn" aria-label="Meny">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+</button>
+
+<!-- Side menu -->
+<div id="menu-overlay"></div>
+<nav id="side-menu">
+
+  <div class="menu-section">
+    <div class="section-label">Kartlag</div>
+    <div class="layer-row">
+      <span>Led</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-led" checked>
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="layer-row">
+      <span>Dybdekurver</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-nve" checked>
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="layer-row">
+      <span>Samferdsel</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-samferdsel" checked>
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="layer-row">
+      <span>Nordre Øyeren naturreservat</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-papirkart">
+        <span class="track"></span>
+      </label>
+    </div>
+    <div class="layer-row">
+      <span>Interessepunkt</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-poi" checked>
+        <span class="track"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="menu-section">
+    <div class="section-label">Bakgrunnskart</div>
+    <div id="basemap-list"></div>
+  </div>
+
+  <div class="menu-section">
+    <button type="button" class="menu-btn-row" id="menu-zoom-btn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg>
+      <span>Zoom til min posisjon</span>
+    </button>
+  </div>
+</nav>
+
+<!-- Info bottom sheet -->
+<div id="info-overlay"></div>
+<div id="info-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <h2>Om Flyt</h2>
+    <button type="button" class="close-btn" id="info-close">✕</button>
+  </div>
+  <div class="card">
+    <p>Flyt er et enkelt kart for båtfolk på Øyeren, laget av Ståle Klommestein. Dette er en eksperimentell versjon.</p>
+    <p><strong>Viktig:</strong> Flyt er ikke ment for navigasjon. Bruk godkjent utstyr og offisielle sjøkart når du ferdes på vannet.</p>
+    <p>Kartdata fra Geodata AS, Kartverket, Statens vegvesen, Entur og NVE.</p>
+    <p>Har du innspill, eller oppdager du noe som ikke stemmer? Send gjerne en e-post til <a href="mailto:stale@klommestein.no">stale@klommestein.no</a>.</p>
+  </div>
+</div>
+
+<!-- Avstandsmåling. Ingen overlay: kartet må være klikkbart mens fliken er oppe -->
+<div id="measure-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <h2>Mål avstand og kjøretid</h2>
+    <button type="button" class="measure-restart" id="measure-restart">Ny måling</button>
+    <button type="button" class="close-btn" id="measure-close">✕</button>
+  </div>
+
+  <div class="card measure-readout">
+    <div class="measure-item">
+      <span class="measure-label">Avstand</span>
+      <span class="measure-value" id="measure-distance">–</span>
+    </div>
+    <div class="measure-item">
+      <span class="measure-label">Kjøretid</span>
+      <span class="measure-value" id="measure-time">–</span>
+    </div>
+  </div>
+
+  <div class="speed-control">
+    <button type="button" class="speed-btn" id="speed-down" aria-label="Senk hastighet">−</button>
+    <span class="speed-value" id="speed-value">5 knop</span>
+    <button type="button" class="speed-btn" id="speed-up" aria-label="Øk hastighet">+</button>
+  </div>
+
+  <p class="menu-hint measure-hint">Trykk i kartet for å sette punkter.</p>
+</div>
+
+<!-- Visning av eksisterende POI -->
+<div id="poi-view-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <h2 id="poi-view-title">Punkt</h2>
+    <button type="button" class="close-btn" id="poi-view-close">✕</button>
+  </div>
+  <img class="poi-view-image" id="poi-view-image" alt="" hidden>
+  <p class="poi-view-description" id="poi-view-description"></p>
+</div>
+
+<!-- Visning av led og punkter fra Samferdsel -->
+<div id="feature-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <h2 id="feature-title">Punkt</h2>
+    <button type="button" class="close-btn" id="feature-close">✕</button>
+  </div>
+  <p class="feature-kind" id="feature-kind"></p>
+  <div class="card" id="feature-fields"></div>
+</div>
+
+<script src="https://js.arcgis.com/4.34/"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ---------------------------------------------------------------------
+  // KONFIGURASJON
+  // ---------------------------------------------------------------------
+  // Alle kartdata ligger som filer i data/ og fliser/. Se README for hvor de
+  // kommer fra og hvordan de oppdateres (lab/verktoy/bygg_data.py).
+  const DATA = {
+    omrade: "data/interesseomrade.geojson",
+    led: "data/led.geojson",
+    poi: "data/poi.geojson",
+    dybde: "data/dybdekurver.geojson",
+    symbologi: "data/symbologi.json",
+    samferdsel: "data/samferdsel/"
+  };
+
+  // Hvor mørkt kartet blir utenfor interesseområdet (0–1)
+  const DIM_OPACITY = 0.45;
+
+  // Synligheten i Samferdsel styres på kartbildets høyde i kilometer, ikke
+  // målestokk, som ville variert med skjermhøyden.
+  const SAMFERDSEL_NEAR_KM = 15;
+  const SAMFERDSEL_CLOSEST_KM = 7;
+
+  // Symbolene er de samme som GeomapSamferdsel bruker
+  const PIN_PARKERING = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAXCAYAAADgKtSgAAAACXBIWXMAAA7EAAAOxAGVKw4bAAABcElEQVRIiWNhoCFgGR6GL9h6ff7DF58c/v9nYCTZICamv/KSvDNiPTW6sRp++OKz+LmbrpFsMAx05lhlMTAwYDf8z59/KAbzcrExMDGhGvDl22+Gv//+YzX8z59/zCi+weeSS0siGBQk+VDEfv3+y7Bm/12G/P5DDG8+/KBuhLKxMjNEuakxGKqJMhjFr2D48esvZYZH1O5kWLnnNpitpyLMsLnHh0FTQZAhK1iXoW/5Beq5/NKdtwwz119laM2wYDBSF6V+OjeCGkqVME/x02JwMJJmYGRkYNBSEGKwNZBi+P3nH8P8rdcpN9zFVBaMYeD7zz8M2T0HGS7efkO54Wv23WG4cu8dmP3u0w+GTYfvMzx88ZmgPuIM338XnlpGYKmIDuKb9jBwsrMwXLyDP+KIMpwRlNaQwKELzxhIAYwMjP9xGq6vKnwh3FlV9z/Df9LLc2am/2JCnAdxGl4YYWhIqqHIYBm6hZQYRgjQ1HAA49lzLhT8pFEAAAAASUVORK5CYII=";
+  const PIN_BUSS = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAXCAYAAADgKtSgAAAACXBIWXMAAA7EAAAOxAGVKw4bAAAB50lEQVRIiWNhoCFgGR6GS8Rv9I60le3mYGXmI9kgZsb/2vL8SyJs5SuxGs7EwJDWv/GWJrkubYnRDWdgYMBu+L///zGCSVmCh8HHVIpBXoyLgZ+bjeHtp58Mt59/Zth08hnDyw8/UNT++fufCcU3uFzBxc7MsKHahsFFX4Iha8YZhov3P8Dl5ES5GZ4t9GOYu+s+Q9rU0zh9gtNwLxMpBhVJXoaVRx4x2OuIYcivPvKYIcRahqFr3XWGO8+/kGa4qiQPQ8ea6wyzdt7F6bL+FEMGVSle0g2XEORguPgAERTYwKPX3xhkRDhxyuM0XFKIk+HVh594DX/98QeDsiQP6YZLCHCAkhbD/ZdfcWo2VBZgOHXrHemGMzIyMrgbSTAQAqdvk2E4CHStu8FgqirE4KiLmVoW7nvAwMGKkqxJM5yfi5WBk40ZqxwPBwsDOysTw+tPP8kzPN1DGadcsJUMmJ6y9TbphpfMu8CwusIKHGGzd2Gm9aYoXYZff/4xTNt2h3TDT956y7D80COGo9feMOw89wJDXkOaj+H7r78M1x9/Is7wn7///kLmly+4iFPjxM23MMR+//33Dafh7z//3iTCx87GxcGCO9vhAoz//2w4+XQKTsMZtkTMf8PAMJ9kg3GAoVuHAgD3T5Vnlr8iFwAAAABJRU5ErkJggg==";
+  const PIN_TOG = "iVBORw0KGgoAAAANSUhEUgAAABcAAAAXCAYAAADgKtSgAAAACXBIWXMAAA7EAAAOxAGVKw4bAAACGklEQVRIiWNhoCFgGR6GS8Rv9I60le3mYGXmI9kgZsb/2vL8SyJs5SuxGs7EwJDWv/GWJjbN0sKcDB+//mZgZ2ViePv5F1YLWmJ0wxkYGLAb/u//f6zBxMzEyJDgrMhw+9lnBjYWJoblhx4x/P33H0Pdn7//mVB8g8+rsiJcDNsb7Bi05fgZGpdfBbs4yFKGYXGRBcOxG28YPBsOMXz69hunfryGxzoqgC1Yc/Qxw8dvvxkEuFkZnr37zrDhxFMGT2NJBh9TKYZlBx+SZzgnGzPD9O13GCoWXsKQW1RoDpanKCn++YsZtiDw688/QloJG57grAhOIciWcLAxMwRbyTIcv/GWMsOlhTkZSgI1CLqSLMMpAXgN//f/P8OcXfcYZu+6y3CyxxUs9vvvPwbFlC0M8/PNwPJkG7734kuGWTmmDEK8bHAxVmYmhuZoXQZVKV6GI9fekG/4oauvGSZuusUwLdMYRTzRRZHBre4gOMeSbTgvJwtDWbAGQ9rU0wyPXn+DixsrCzE0x+gw7Lv0EmsxQJThvUmGDBtPPmWYvfMeivjOcy8YzNWFGMqCNBja11wnzvCfv//Cizt2ViaGk7feMiw/hD17p04+w+BuJMHAyMjAAIvX33//fcNp+PvPvzeJ8LGzcXGwcIL4uy+8ZBDh48DpsoNXXjPIinBDOIz//2w4+XQKTsMZtkTMf8PAMB+naSSCoVuHAgDvArB4zw2CRgAAAABJRU5ErkJggg==";
+
+  const PARKERING_FIELDS = [
+    ["type", "Type"],
+    ["bruksområde", "Bruksområde"],
+    ["innfartsparkering", "Innfartsparkering"],
+    ["antall_parkeringsplasser_små_k", "Plasser, små kjøretøy"],
+    ["antall_parkeringsplasser_store_", "Plasser, store kjøretøy"],
+    ["antall_avgiftsfrie_plasser", "Avgiftsfrie plasser"],
+    ["antall_avgiftsbelagte_plasser", "Avgiftsbelagte plasser"],
+    ["plasser_reservert_handikappede", "HC-plasser"],
+    ["antall_ladeplasser", "Ladeplasser"],
+    ["avgift", "Avgift"],
+    ["avgifts__restriksjonsinfo", "Avgift og restriksjoner"],
+    ["adresse", "Adresse"],
+    ["eier", "Eier"],
+    ["parkeringstilbyder_navn", "Parkeringstilbyder"]
+  ];
+
+  const HOLDEPLASS_FIELDS = [
+    ["stoptypename", "Type"],
+    ["shortname", "Kortnavn"],
+    ["zone_name", "Sone"],
+    ["description", "Beskrivelse"]
+  ];
+
+  // Bakgrunnskart å veksle mellom (hentet fra Geodata sitt UTM33-basemap-galleri).
+  const BASEMAPS = [
+    {
+      title: "Flyfoto",
+      type: "tile",
+      url: "https://services.geodataonline.no/arcgis/rest/services/Geocache_UTM33_EUREF89/GeocacheBilder/MapServer"
+    },
+    {
+      title: "Gråtone",
+      type: "vector",
+      styleUrl: "https://services.geodataonline.no/arcgis/rest/services/GeocacheVector/GeocacheGraatone/VectorTileServer/resources/styles/root.json"
+    },
+    {
+      title: "Basis terreng",
+      type: "vector-multi",
+      styleUrls: [
+        "https://services.geodataonline.no/arcgis/rest/services/GeocacheVector/GeocacheOSMBasis/VectorTileServer/resources/styles/root.json",
+        "https://services.geodataonline.no/arcgis/rest/services/GeocacheVector/GeocacheBasisTerreng/VectorTileServer/resources/styles/root.json"
+      ]
+    }
+  ];
+
+  // Flisskjemaet til papirkartet, slik det lå i tjenesten i AGOL. Flisene
+  // finnes bare for nivå 11–16; dypere inn forstørres nivå 16.
+  const PAPIRKART = {
+    // WebTileLayer godtar ikke relative maler, så adressen gjøres absolutt
+    urlTemplate: new URL("fliser/papirkart/", location.href).href + "{level}/{row}/{col}.png",
+    origin: { x: -9497963.942936342, y: 9997963.942936342 },
+    level0Resolution: 78109.09346731178,
+    minLevel: 11,
+    maxLevel: 16,
+    extent: { xmin: 279108.60383081797, ymin: 6638710.8563607745, xmax: 289757.2849751345, ymax: 6652861.020929833 }
+  };
+
+  const layerRefs = {};
+
+  let stopMeasuring = function () {};
+  let restartMeasuring = function () {};
+  let setInspectHighlight = function () {};
+  let clearInspectHighlight = function () {};
+
+  // ---------------------------------------------------------------------
+  // Side-meny åpne/lukke (uavhengig av kartet)
+  // ---------------------------------------------------------------------
+  const menuBtn = document.getElementById("menu-btn");
+  const sideMenu = document.getElementById("side-menu");
+  const menuOverlay = document.getElementById("menu-overlay");
+
+  function openMenu() { sideMenu.classList.add("open"); menuOverlay.classList.add("open"); }
+  function closeMenu() { sideMenu.classList.remove("open"); menuOverlay.classList.remove("open"); }
+
+  menuBtn.addEventListener("click", openMenu);
+  menuOverlay.addEventListener("click", closeMenu);
+
+  // ---------------------------------------------------------------------
+  // Info-flik (uavhengig av kartet)
+  // ---------------------------------------------------------------------
+  const infoBtn = document.getElementById("info-btn");
+  const measureBtn = document.getElementById("measure-btn");
+  const infoOverlay = document.getElementById("info-overlay");
+  const infoSheet = document.getElementById("info-sheet");
+  const infoClose = document.getElementById("info-close");
+
+  function openInfo() { infoOverlay.classList.add("open"); infoSheet.classList.add("open"); }
+  function closeInfo() { infoOverlay.classList.remove("open"); infoSheet.classList.remove("open"); }
+
+  infoBtn.addEventListener("click", openInfo);
+  infoClose.addEventListener("click", closeInfo);
+  infoOverlay.addEventListener("click", closeInfo);
+
+  // ---------------------------------------------------------------------
+  // Avstandsmåling — visning av resultat og båthastighet
+  // ---------------------------------------------------------------------
+  const measureSheet = document.getElementById("measure-sheet");
+  const measureClose = document.getElementById("measure-close");
+  const measureRestart = document.getElementById("measure-restart");
+  const measureDistance = document.getElementById("measure-distance");
+  const measureTime = document.getElementById("measure-time");
+  const speedValue = document.getElementById("speed-value");
+  const speedUp = document.getElementById("speed-up");
+  const speedDown = document.getElementById("speed-down");
+
+  const MIN_SPEED = 1;
+  const MAX_SPEED = 40;
+  let boatSpeedKnots = 5;
+  let measuredMeters = null;
+
+  // Kalles fra kartet hver gang målingen endrer seg
+  function setMeasuredLength(meters) {
+    measuredMeters = meters;
+    renderMeasurement();
+  }
+
+  function renderMeasurement() {
+    speedValue.textContent = boatSpeedKnots + " knop";
+
+    if (!measuredMeters) {
+      measureDistance.textContent = "–";
+      measureTime.textContent = "–";
+      return;
+    }
+
+    measureDistance.textContent = formatDistance(measuredMeters);
+    // 1 knop = 1 nautisk mil i timen = 1852 m/t
+    const metersPerSecond = boatSpeedKnots * 1852 / 3600;
+    measureTime.textContent = formatDuration(measuredMeters / metersPerSecond);
+  }
+
+  function formatDistance(meters) {
+    if (meters < 1000) return Math.round(meters) + " m";
+    return (meters / 1000).toFixed(2).replace(".", ",") + " km";
+  }
+
+  function formatDuration(seconds) {
+    if (seconds < 60) return Math.round(seconds) + " sek";
+    const totalMinutes = Math.round(seconds / 60);
+    if (totalMinutes < 60) return totalMinutes + " min";
+    return Math.floor(totalMinutes / 60) + " t " + (totalMinutes % 60) + " min";
+  }
+
+  function changeSpeed(delta) {
+    boatSpeedKnots = Math.min(MAX_SPEED, Math.max(MIN_SPEED, boatSpeedKnots + delta));
+    renderMeasurement();
+  }
+
+  speedUp.addEventListener("click", function () { changeSpeed(1); });
+  speedDown.addEventListener("click", function () { changeSpeed(-1); });
+  measureClose.addEventListener("click", function () { stopMeasuring(); });
+  measureRestart.addEventListener("click", function () { restartMeasuring(); });
+
+  // ---------------------------------------------------------------------
+  // Visning av interessepunkter
+  // ---------------------------------------------------------------------
+  const poiViewSheet = document.getElementById("poi-view-sheet");
+  const poiViewClose = document.getElementById("poi-view-close");
+  const poiViewTitle = document.getElementById("poi-view-title");
+  const poiViewImage = document.getElementById("poi-view-image");
+  const poiViewDescription = document.getElementById("poi-view-description");
+
+  function closePoiView() {
+    poiViewSheet.classList.remove("open");
+  }
+  poiViewClose.addEventListener("click", function () {
+    closePoiView();
+    clearInspectHighlight();
+  });
+
+  // Skriver teksten som tekstnoder og lenker, aldri som innerHTML. Bare
+  // http, https og www-adresser blir lenker, så f.eks. javascript:-adresser
+  // kan ikke bli klikkbare.
+  function renderTextWithLinks(container, text) {
+    container.textContent = "";
+    if (!text) return;
+
+    const pattern = /(?:https?:\/\/|www\.)[^\s]+/gi;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = pattern.exec(text)) !== null) {
+      let url = match[0];
+
+      // Skilletegn til slutt hører som regel til setningen, ikke adressen
+      const trailing = url.match(/[.,;:!?)\]}'"]+$/);
+      if (trailing) {
+        url = url.slice(0, url.length - trailing[0].length);
+        pattern.lastIndex -= trailing[0].length;
+      }
+      if (!url) continue;
+
+      if (match.index > lastIndex) {
+        container.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+      }
+
+      const link = document.createElement("a");
+      link.href = /^www\./i.test(url) ? "https://" + url : url;
+      link.textContent = url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      container.appendChild(link);
+
+      lastIndex = match.index + url.length;
+    }
+
+    if (lastIndex < text.length) {
+      container.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+  }
+
+  function showPoi(graphic) {
+    closeFeatureSheet();
+    setInspectHighlight(graphic.geometry);
+
+    const attrs = graphic.attributes || {};
+    poiViewTitle.textContent = attrs.tittel || "Punkt";
+    renderTextWithLinks(poiViewDescription, attrs.beskrivelse || "");
+
+    if (attrs.bilde) {
+      poiViewImage.src = attrs.bilde;
+      poiViewImage.hidden = false;
+    } else {
+      poiViewImage.removeAttribute("src");
+      poiViewImage.hidden = true;
+    }
+
+    poiViewSheet.classList.add("open");
+  }
+
+  // ---------------------------------------------------------------------
+  // Visning av led og punkter fra Samferdsel
+  // ---------------------------------------------------------------------
+  const featureSheet = document.getElementById("feature-sheet");
+  const featureClose = document.getElementById("feature-close");
+  const featureTitle = document.getElementById("feature-title");
+  const featureKind = document.getElementById("feature-kind");
+  const featureFields = document.getElementById("feature-fields");
+
+  function closeFeatureSheet() {
+    featureSheet.classList.remove("open");
+  }
+  featureClose.addEventListener("click", function () {
+    closeFeatureSheet();
+    clearInspectHighlight();
+  });
+
+  // Lukker begge "se på objekt"-flikene og fjerner markeringen i kartet
+  function closeInspectSheets() {
+    closeFeatureSheet();
+    closePoiView();
+    clearInspectHighlight();
+  }
+
+  // kind er "parkering", "buss" eller "tog"
+  function showSamferdselFeature(graphic, kind) {
+    const attrs = graphic.attributes || {};
+    const isParkering = kind === "parkering";
+    const fields = isParkering ? PARKERING_FIELDS : HOLDEPLASS_FIELDS;
+    const layerName = isParkering ? "Parkeringsplass" : (kind === "tog" ? "Tog" : "Buss");
+
+    const name = isParkering
+      ? (isMeaningfulValue(attrs.navn) ? attrs.navn : attrs.referanse)
+      : attrs.name;
+
+    featureTitle.textContent = isMeaningfulValue(name) ? name.toString() : layerName;
+    featureKind.textContent = layerName;
+    featureKind.hidden = false;
+
+    featureFields.innerHTML = "";
+    let shown = 0;
+    fields.forEach(function (pair) {
+      const value = attrs[pair[0]];
+      if (!isMeaningfulValue(value)) return;
+
+      const row = document.createElement("div");
+      row.className = "feature-row";
+
+      const key = document.createElement("span");
+      key.className = "k";
+      key.textContent = pair[1];
+
+      const val = document.createElement("span");
+      val.className = "v";
+      val.textContent = formatAttrValue(value);
+
+      row.appendChild(key);
+      row.appendChild(val);
+      featureFields.appendChild(row);
+      shown++;
+    });
+
+    if (!shown) {
+      const empty = document.createElement("div");
+      empty.className = "feature-empty";
+      empty.textContent = "Ingen flere opplysninger registrert.";
+      featureFields.appendChild(empty);
+    }
+
+    closePoiView();
+    setInspectHighlight(graphic.geometry);
+    featureSheet.classList.add("open");
+  }
+
+  // Led-feltet er et heltall (1-4). Navnet hentes fra lagets symbologi.
+  function ledName(value) {
+    const layer = layerRefs.led;
+    const infos = layer && layer.renderer && layer.renderer.uniqueValueInfos;
+    let label = null;
+
+    if (infos) {
+      infos.forEach(function (info) {
+        if (String(info.value) === String(value)) label = info.label;
+      });
+    }
+    if (!label) label = (value === null || value === undefined) ? "" : String(value);
+    if (!label) return "Led";
+
+    // "Kanoled" inneholder allerede ordet, så det skal ikke dobles
+    return /led$/i.test(label) ? label : label + " led";
+  }
+
+  function showLed(graphic) {
+    closePoiView();
+    setInspectHighlight(graphic.geometry);
+
+    const attrs = graphic.attributes || {};
+    featureTitle.textContent = ledName(attrs.Led);
+    featureKind.textContent = "";
+    featureKind.hidden = true;
+
+    featureFields.innerHTML = "";
+
+    const hastighet = attrs.Hastighet;
+    if (isMeaningfulValue(hastighet)) {
+      const text = hastighet.toString().trim();
+      const prefix = /^maks/i.test(text) ? "" : "maks ";
+      featureFields.appendChild(buildFeatureLine("Hastighet: " + prefix + text));
+    }
+
+    const info = attrs.Info;
+    if (isMeaningfulValue(info)) {
+      featureFields.appendChild(buildFeatureLine(info.toString().trim()));
+    }
+
+    if (!featureFields.childNodes.length) {
+      featureFields.appendChild(buildFeatureLine("Ingen opplysninger registrert."));
+    }
+
+    featureSheet.classList.add("open");
+  }
+
+  function buildFeatureLine(text) {
+    const line = document.createElement("p");
+    line.className = "feature-line";
+    line.textContent = text;
+    return line;
+  }
+
+  // Kodeverdier som AVGRENSET_OMRADE leses lettere som vanlig tekst
+  function formatAttrValue(value) {
+    const text = value.toString().trim();
+    if (!/^[A-ZÆØÅ0-9_]{2,}$/.test(text) || /^\d+$/.test(text)) return text;
+    const words = text.replace(/_/g, " ").toLowerCase();
+    return words.charAt(0).toUpperCase() + words.slice(1);
+  }
+
+  // Tjenesten bruker både null, tom streng og "Null"/"<Null>" for manglende verdi
+  function isMeaningfulValue(value) {
+    if (value === null || value === undefined) return false;
+    const text = value.toString().trim();
+    if (!text) return false;
+    const lower = text.toLowerCase();
+    return lower !== "null" && lower !== "<null>" && lower !== "ukjent";
+  }
+
+  // Webkartets lageffekter (drop-shadow, brightness …) som CSS-filterstreng
+  function effectToCss(effects) {
+    if (!effects || !effects.length) return null;
+    return effects.map(function (e) {
+      if (e.type === "drop-shadow") {
+        const c = e.color || [0, 0, 0, 255];
+        return "drop-shadow(" + (e.xoffset || 0) + "px " + (e.yoffset || 0) + "px " + (e.blurRadius || 0) +
+          "px rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + (c[3] / 255) + "))";
+      }
+      return e.type + "(" + e.amount + ")";
+    }).join(" ");
+  }
+
+  // ---------------------------------------------------------------------
+  // Kart (ArcGIS Maps SDK for JavaScript) — feiler dette, virker resten av appen fortsatt
+  // ---------------------------------------------------------------------
+  if (typeof require !== "function") {
+    console.error("ArcGIS Maps SDK ble ikke lastet inn (require er ikke definert) — kartet vises ikke.");
+    return;
+  }
+
+  require([
+    "esri/Map",
+    "esri/views/MapView",
+    "esri/Graphic",
+    "esri/geometry/Point",
+    "esri/geometry/Extent",
+    "esri/geometry/Polyline",
+    "esri/geometry/Polygon",
+    "esri/geometry/geometryEngine",
+    "esri/geometry/operators/projectOperator",
+    "esri/geometry/operators/offsetOperator",
+    "esri/layers/GraphicsLayer",
+    "esri/layers/GeoJSONLayer",
+    "esri/layers/GroupLayer",
+    "esri/layers/TileLayer",
+    "esri/layers/VectorTileLayer",
+    "esri/layers/WebTileLayer",
+    "esri/layers/support/TileInfo",
+    "esri/Basemap",
+    "esri/renderers/support/jsonUtils",
+    "esri/layers/support/LabelClass",
+    "esri/core/reactiveUtils"
+  ], function (EsriMap, MapView, Graphic, Point, Extent, Polyline, Polygon, geometryEngine, projectOperator, offsetOperator, GraphicsLayer, GeoJSONLayer,
+               GroupLayer, TileLayer, VectorTileLayer, WebTileLayer, TileInfo, Basemap, rendererJsonUtils,
+               LabelClass, reactiveUtils) {
+
+    // ---------------- Bakgrunnskart ----------------
+    function buildBasemap(bm) {
+      if (bm.type === "tile") {
+        return new Basemap({ baseLayers: [new TileLayer({ url: bm.url })] });
+      }
+      if (bm.type === "vector") {
+        return new Basemap({ baseLayers: [new VectorTileLayer({ url: bm.styleUrl })] });
+      }
+      if (bm.type === "vector-multi") {
+        return new Basemap({ baseLayers: bm.styleUrls.map(function (u) { return new VectorTileLayer({ url: u }); }) });
+      }
+      return null;
+    }
+
+    const map = new EsriMap({ basemap: buildBasemap(BASEMAPS[0]) });
+
+    const view = new MapView({
+      container: "viewDiv",
+      map: map,
+      spatialReference: { wkid: 25833 },
+      // Standard-popup er av: alle klikkbare lag har egne flikker i appen
+      popupEnabled: false
+    });
+
+    // Flytt kartets innebygde zoom-knapper vekk fra øverste venstre hjørne,
+    // slik at de ikke kolliderer med info-knappen og LAB-merket.
+    view.ui.move("zoom", "top-right");
+
+    // Startvisningen er den samme som webkartet i AGOL hadde
+    fetch(DATA.symbologi).then(function (r) { return r.json(); }).then(function (symbologi) {
+      const vp = symbologi.startvisning;
+      if (vp && vp.targetGeometry) {
+        view.extent = Extent.fromJSON(vp.targetGeometry);
+        view.rotation = vp.rotation || 0;
+      }
+      addDataLayers(symbologi);
+    }).catch(function (err) {
+      console.error("Kunne ikke laste symbologien", err);
+    });
+
+    // ---------------- Grafikklag for måling, markering og posisjon ----------------
+    const measureGraphicsLayer = new GraphicsLayer({ title: "Måling" });
+    const inspectGraphicsLayer = new GraphicsLayer({ title: "Valgt objekt" });
+    const locationGraphicsLayer = new GraphicsLayer({ title: "Min posisjon" });
+
+    setInspectHighlight = function (geometry) {
+      inspectGraphicsLayer.removeAll();
+      if (!geometry) return;
+
+      const symbol = geometry.type === "polyline"
+        ? { type: "simple-line", color: [0, 230, 118, 1], width: 6 }
+        : {
+            type: "simple-marker",
+            style: "circle",
+            color: [0, 0, 0, 0],
+            size: 34,
+            outline: { color: [0, 230, 118, 1], width: 3 }
+          };
+
+      inspectGraphicsLayer.add(new Graphic({ geometry: geometry, symbol: symbol }));
+    };
+
+    clearInspectHighlight = function () { inspectGraphicsLayer.removeAll(); };
+
+    // ---------------- Dimming utenfor interesseområdet ----------------
+    // Et stort rektangel med interesseområdet som hull, tegnet som én grafikk.
+    // (Som GeoJSONLayer ble et så stort polygon bare tegnet i enkelte fliser.)
+    // Området er lagret i WGS84 og projiseres til kartets UTM33 her.
+    function buildDimLayer(omrade) {
+      const geom = omrade.features[0].geometry;
+      const polygons = geom.type === "Polygon" ? [geom.coordinates] : geom.coordinates;
+      const holes = new Polygon({
+        rings: polygons.map(function (rings) { return rings[0]; }),
+        spatialReference: { wkid: 4326 }
+      });
+
+      return projectOperator.load().then(function () {
+        const projected = projectOperator.execute(holes, { wkid: 25833 });
+
+        // Godt utenfor Norge, men innenfor flisskjemaet til bakgrunnskartene
+        // (origo -2 500 000, 9 045 984). Går polygonet forbi origo, feiler
+        // flisene over. Ytre ring med klokka og hull mot klokka, slik Esri vil ha det.
+        const outer = [[-2400000, 5000000], [-2400000, 9000000], [3000000, 9000000], [3000000, 5000000], [-2400000, 5000000]];
+        const holeRings = projected.rings.map(function (ring) {
+          return ringIsClockwise(ring) ? ring.slice().reverse() : ring;
+        });
+
+        const layer = new GraphicsLayer({ title: "Dimming", opacity: DIM_OPACITY });
+        layer.add(new Graphic({
+          geometry: new Polygon({ rings: [outer].concat(holeRings), spatialReference: { wkid: 25833 } }),
+          symbol: { type: "simple-fill", color: [12, 18, 24, 1], outline: { color: [0, 0, 0, 0], width: 0 } }
+        }));
+        return layer;
+      });
+    }
+
+    // Med klokka i et koordinatsystem der y øker oppover
+    function ringIsClockwise(ring) {
+      let sum = 0;
+      for (let i = 0; i < ring.length - 1; i++) {
+        sum += (ring[i + 1][0] - ring[i][0]) * (ring[i + 1][1] + ring[i][1]);
+      }
+      return sum > 0;
+    }
+
+    // ---------------- Papirkart ----------------
+    function buildPapirkartLayer() {
+      const lods = [];
+      for (let level = PAPIRKART.minLevel; level <= PAPIRKART.maxLevel; level++) {
+        const resolution = PAPIRKART.level0Resolution / Math.pow(2, level);
+        // 96 dpi: målestokk = oppløsning × 96 / 0,0254
+        lods.push({ level: level, resolution: resolution, scale: resolution * 96 / 0.0254 });
+      }
+
+      return new WebTileLayer({
+        urlTemplate: PAPIRKART.urlTemplate,
+        title: "Nordre Øyeren naturreservat",
+        minScale: 471134,
+        visible: document.getElementById("toggle-papirkart").checked,
+        tileInfo: new TileInfo({
+          size: [256, 256],
+          dpi: 96,
+          format: "mixed",
+          origin: { x: PAPIRKART.origin.x, y: PAPIRKART.origin.y, spatialReference: { wkid: 25833 } },
+          spatialReference: { wkid: 25833 },
+          lods: lods
+        }),
+        spatialReference: { wkid: 25833 },
+        fullExtent: new Extent(Object.assign({ spatialReference: { wkid: 25833 } }, PAPIRKART.extent))
+      });
+    }
+
+    // ---------------- Led med halo ----------------
+    // Røde og grønne linjer er lagret fra sør mot nord (se bygg_data.py), så
+    // venstre side er vest og høyre side øst. Haloen er en bred, halvgjennom-
+    // siktig strek forskjøvet til sin side: rød mot vest, grønn mot øst.
+    //
+    // Forskyvningen regnes ut her i meter for gjeldende zoom, slik at den
+    // alltid er like mange piksler. CIM-symbolenes egen offset-effekt ble
+    // regnet ut på grove fliser og havnet langt fra linjen ved høy zoom.
+    const HALO = {
+      1: { color: [255, 40, 40], side: -1 },   // Rød: venstre = vest
+      2: { color: [40, 220, 60], side: 1 }     // Grønn: høyre = øst
+    };
+    // Piksler fra linjens senter til haloens senter, og haloens bredde
+    const HALO_STROKES = [
+      { offsetPx: 6, width: 6, alpha: 0.6 },
+      { offsetPx: 8, width: 12, alpha: 0.25 }
+    ];
+
+    const ledHaloLayer = new GraphicsLayer({ title: "Led-halo", minScale: 737281 });
+    let ledLines = [];
+    let haloResolution = null;
+
+    function loadLedLines() {
+      const query = layerRefs.led.createQuery();
+      query.where = "Led IN (1, 2)";
+      query.returnGeometry = true;
+      query.outFields = ["Led"];
+      query.outSpatialReference = view.spatialReference;
+      return layerRefs.led.queryFeatures(query).then(function (result) {
+        ledLines = result.features.map(function (f) {
+          return { led: f.attributes.Led, geometry: f.geometry };
+        });
+        haloResolution = null;
+        drawLedHalo();
+      });
+    }
+
+    function drawLedHalo() {
+      if (!ledLines.length || !view.resolution) return;
+      // Bare når zoomen faktisk har endret seg
+      if (haloResolution && Math.abs(haloResolution - view.resolution) / view.resolution < 0.01) return;
+      haloResolution = view.resolution;
+
+      const graphics = [];
+      ledLines.forEach(function (line) {
+        const halo = HALO[line.led];
+        if (!halo) return;
+        HALO_STROKES.forEach(function (stroke) {
+          // Kartet er i meter, så avstanden oppgis i meter. Negative verdier
+          // legger seg til venstre. (geometryEngine.offset ga null for enkelte
+          // linjer ved visse avstander, offsetOperator ikke.)
+          const distance = halo.side * stroke.offsetPx * view.resolution;
+          const geometry = offsetOperator.execute(line.geometry, distance, { joins: "round" });
+          if (!geometry) return;
+          graphics.push(new Graphic({
+            geometry: geometry,
+            symbol: {
+              type: "simple-line",
+              color: halo.color.concat([stroke.alpha]),
+              width: stroke.width * 0.75,   // punkter, ikke piksler
+              cap: "round",
+              join: "round"
+            }
+          }));
+        });
+      });
+      ledHaloLayer.removeAll();
+      ledHaloLayer.addMany(graphics);
+    }
+
+    // ---------------- Samferdsel ----------------
+    function pictureMarker(base64, size) {
+      return { type: "picture-marker", url: "data:image/png;base64," + base64, width: size, height: size };
+    }
+
+    // Sublagene fra GeomapSamferdsel, med symbologien fra tjenesten og
+    // webkartets overstyringer (størrelser og traktorveifarge).
+    // near: vises når kartbildet er lavere enn SAMFERDSEL_NEAR_KM,
+    // closest: vises når det er lavere enn SAMFERDSEL_CLOSEST_KM.
+    const SAMFERDSEL_LAYERS = [
+      {
+        key: "veg",
+        range: "always",
+        renderer: {
+          type: "unique-value",
+          field: "vegkategori",
+          defaultSymbol: { type: "simple-line", color: [156, 156, 156, 1], width: 2 },
+          uniqueValueInfos: [
+            { value: "P", label: "Privat veg", symbol: { type: "simple-line", color: [156, 156, 156, 1], width: 2 } },
+            { value: "S", label: "Skogsbilveg", symbol: { type: "simple-line", color: [156, 156, 156, 1], width: 2.27 } },
+            { value: "K", label: "Kommunalveg", symbol: { type: "simple-line", color: [104, 138, 228, 1], width: 2.83 } },
+            { value: "F", label: "Fylkesveg", symbol: { type: "simple-line", color: [255, 170, 0, 1], width: 3 } },
+            { value: "R", label: "Riksveg", symbol: { type: "simple-line", color: [230, 152, 0, 1], width: 3 } },
+            { value: "E", label: "Europaveg", symbol: { type: "simple-line", color: [255, 85, 0, 1], width: 3 } }
+          ]
+        }
+      },
+      {
+        key: "traktorveg",
+        range: "closest",
+        renderer: { type: "simple", symbol: { type: "simple-line", color: [0, 171, 57, 1], width: 1 } }
+      },
+      {
+        key: "anleggsveg",
+        range: "near",
+        renderer: { type: "simple", symbol: { type: "simple-line", style: "dash", color: [156, 156, 156, 1], width: 2.5 } }
+      },
+      {
+        key: "traktorvegsperring",
+        range: "closest",
+        renderer: {
+          type: "simple",
+          symbol: { type: "simple-marker", style: "circle", color: [230, 0, 0, 0.6], size: 6, outline: { color: [0, 0, 0, 1], width: 0.6 } }
+        }
+      },
+      { key: "parkering", range: "near", clickable: true, renderer: { type: "simple", symbol: pictureMarker(PIN_PARKERING, 13.5) } },
+      { key: "buss", range: "near", clickable: true, renderer: { type: "simple", symbol: pictureMarker(PIN_BUSS, 26.25) } },
+      { key: "tog", range: "near", clickable: true, renderer: { type: "simple", symbol: pictureMarker(PIN_TOG, 17) } }
+    ];
+
+    const samferdselByLayer = new Map();
+
+    function buildSamferdselLayer() {
+      const sublayers = SAMFERDSEL_LAYERS.map(function (def) {
+        const layer = new GeoJSONLayer({
+          url: DATA.samferdsel + def.key + ".geojson",
+          title: def.key,
+          outFields: ["*"],
+          renderer: def.renderer,
+          visible: def.range === "always"
+        });
+        samferdselByLayer.set(layer, def);
+        return layer;
+      });
+
+      return new GroupLayer({
+        title: "Samferdsel",
+        visible: document.getElementById("toggle-samferdsel").checked,
+        // Veiene nederst, punktene øverst
+        layers: sublayers
+      });
+    }
+
+    function updateSamferdselVisibility() {
+      if (!layerRefs.samferdsel || !view.extent) return;
+
+      // Kartets utstrekning er i meter (UTM33), altså høyden fra topp til bunn
+      const heightKm = view.extent.height / 1000;
+      samferdselByLayer.forEach(function (def, layer) {
+        const visible = def.range === "always" ||
+          (def.range === "near" && heightKm <= SAMFERDSEL_NEAR_KM) ||
+          (def.range === "closest" && heightKm <= SAMFERDSEL_CLOSEST_KM);
+        if (layer.visible !== visible) layer.visible = visible;
+      });
+    }
+
+    reactiveUtils.watch(
+      function () { return view.stationary; },
+      function (stationary) {
+        if (!stationary) return;
+        updateSamferdselVisibility();
+        drawLedHalo();
+      }
+    );
+
+    // ---------------- Alle datalag ----------------
+    function addDataLayers(symbologi) {
+      layerRefs.papirkart = buildPapirkartLayer();
+
+      layerRefs.nve = new GeoJSONLayer({
+        url: DATA.dybde,
+        title: "Dybdekurver",
+        minScale: 686967,
+        visible: document.getElementById("toggle-nve").checked,
+        renderer: rendererJsonUtils.fromJSON(symbologi.dybde),
+        labelingInfo: [new LabelClass({
+          labelExpressionInfo: { expression: "$feature.dybde_m" },
+          labelPlacement: "center-along",
+          // Samme grense som webkartet: etikettene kommer fra 1:40 000 og innover
+          minScale: 40001,
+          symbol: {
+            type: "text",
+            color: [255, 255, 255, 1],
+            font: { family: "Arial", size: 12.5 }
+          }
+        })]
+      });
+
+      layerRefs.samferdsel = buildSamferdselLayer();
+
+      layerRefs.led = new GeoJSONLayer({
+        url: DATA.led,
+        title: "Led",
+        outFields: ["*"],
+        minScale: 737281,
+        visible: document.getElementById("toggle-led").checked,
+        renderer: rendererJsonUtils.fromJSON(symbologi.led)
+      });
+      ledHaloLayer.visible = layerRefs.led.visible;
+      loadLedLines().catch(function (err) { console.warn("Kunne ikke lage haloen til leden", err); });
+
+      layerRefs.poi = new GeoJSONLayer({
+        url: DATA.poi,
+        title: "Interessepunkt",
+        outFields: ["*"],
+        visible: document.getElementById("toggle-poi").checked,
+        renderer: rendererJsonUtils.fromJSON(symbologi.poi),
+        effect: effectToCss(symbologi.poiEffekt)
+      });
+
+      map.addMany([
+        layerRefs.papirkart,
+        layerRefs.samferdsel,
+        layerRefs.nve,
+        ledHaloLayer,
+        layerRefs.led,
+        layerRefs.poi,
+        measureGraphicsLayer,
+        inspectGraphicsLayer,
+        locationGraphicsLayer
+      ]);
+
+      // Dimmingen legges rett over bakgrunnskartet og papirkartet
+      fetch(DATA.omrade).then(function (r) { return r.json(); }).then(buildDimLayer).then(function (dimLayer) {
+        map.add(dimLayer, 1);
+      }).catch(function (err) {
+        console.warn("Kunne ikke laste interesseområdet", err);
+      });
+
+      updateSamferdselVisibility();
+
+      // Får tegnelaget klart på forhånd, så første målepunkt ikke venter på
+      // at laget skal initialiseres
+      view.whenLayerView(measureGraphicsLayer).catch(function () {});
+    }
+
+    // ---------------- Avstandsmåling ----------------
+    // Tegnes selv, ikke med Esris måleverktøy: der festet gummistrikk-linjen
+    // seg til stedet man trykket ned for å panorere. Her legges punkter bare
+    // til på klikk som ikke er en panorering.
+    let measuring = false;
+    let measureVertices = [];
+
+    function redrawMeasurement() {
+      measureGraphicsLayer.removeAll();
+
+      if (measureVertices.length > 1) {
+        const line = new Polyline({
+          paths: [measureVertices.map(function (p) { return [p.x, p.y]; })],
+          spatialReference: view.spatialReference
+        });
+        measureGraphicsLayer.add(new Graphic({
+          geometry: line,
+          symbol: { type: "simple-line", color: [0, 230, 118, 1], width: 3 }
+        }));
+        setMeasuredLength(geometryEngine.planarLength(line, "meters"));
+      } else {
+        setMeasuredLength(measureVertices.length ? 0 : null);
+      }
+
+      measureVertices.forEach(function (point) {
+        measureGraphicsLayer.add(new Graphic({
+          geometry: point,
+          symbol: {
+            type: "simple-marker",
+            style: "circle",
+            color: [255, 255, 255, 1],
+            size: 9,
+            outline: { color: [0, 230, 118, 1], width: 2 }
+          }
+        }));
+      });
+    }
+
+    // All klikkhåndtering går på "immediate-click". "click" venter på
+    // dobbeltklikk-vinduet, og to raske trykk tolkes da som dobbeltklikk.
+    // "immediate-click" skiller ikke selv trykk fra panorering, så det holdes
+    // styr på om fingeren har dratt siden den ble satt ned.
+    let pointerDragged = false;
+    view.on("pointer-down", function () { pointerDragged = false; });
+    view.on("drag", function () { pointerDragged = true; });
+
+    restartMeasuring = function () {
+      measureVertices = [];
+      redrawMeasurement();
+    };
+
+    stopMeasuring = function () {
+      if (!measuring) return;
+      measuring = false;
+      measureVertices = [];
+      measureGraphicsLayer.removeAll();
+      setMeasuredLength(null);
+      view.container.style.cursor = "";
+      measureSheet.classList.remove("open");
+      measureBtn.classList.remove("active");
+    };
+
+    measureBtn.addEventListener("click", function () {
+      if (measuring) {
+        stopMeasuring();
+        return;
+      }
+      measuring = true;
+      measureVertices = [];
+      redrawMeasurement();
+      view.container.style.cursor = "crosshair";
+      measureSheet.classList.add("open");
+      measureBtn.classList.add("active");
+    });
+
+    // ---------------- Klikk i kartet ----------------
+    view.on("immediate-click", function (event) {
+      // Panorering skal ikke telle som et trykk
+      if (pointerDragged) return;
+
+      if (measuring) {
+        event.stopPropagation();
+        if (event.mapPoint) {
+          measureVertices.push(event.mapPoint);
+          redrawMeasurement();
+        }
+        return;
+      }
+
+      // Rekkefølgen avgjør hvem som vinner når flere treffes: punktene foran
+      // leden, og interessepunktene foran samferdselspunktene
+      const clickable = [];
+      samferdselByLayer.forEach(function (def, layer) { if (def.clickable) clickable.push(layer); });
+      const include = [layerRefs.poi].concat(clickable, [layerRefs.led]).filter(Boolean);
+
+      view.hitTest(event, { include: include }).then(function (response) {
+        const hits = (response.results || []).filter(function (r) { return r.graphic; });
+        if (!hits.length) {
+          closeInspectSheets();
+          return;
+        }
+
+        const rank = function (hit) { return include.indexOf(hit.graphic.layer); };
+        hits.sort(function (a, b) { return rank(a) - rank(b); });
+        const graphic = hits[0].graphic;
+
+        if (graphic.layer === layerRefs.poi) {
+          showPoi(graphic);
+          return;
+        }
+        if (graphic.layer === layerRefs.led) {
+          showLed(graphic);
+          return;
+        }
+        const def = samferdselByLayer.get(graphic.layer);
+        if (def) showSamferdselFeature(graphic, def.key);
+      });
+    });
+
+    // ---------------- Lagbrytere ----------------
+    document.getElementById("toggle-led").addEventListener("change", function (e) {
+      if (layerRefs.led) layerRefs.led.visible = e.target.checked;
+      ledHaloLayer.visible = e.target.checked;
+    });
+    document.getElementById("toggle-papirkart").addEventListener("change", function (e) {
+      if (layerRefs.papirkart) layerRefs.papirkart.visible = e.target.checked;
+    });
+    document.getElementById("toggle-nve").addEventListener("change", function (e) {
+      if (layerRefs.nve) layerRefs.nve.visible = e.target.checked;
+    });
+    document.getElementById("toggle-poi").addEventListener("change", function (e) {
+      if (layerRefs.poi) layerRefs.poi.visible = e.target.checked;
+    });
+    document.getElementById("toggle-samferdsel").addEventListener("change", function (e) {
+      if (layerRefs.samferdsel) layerRefs.samferdsel.visible = e.target.checked;
+    });
+
+    // ---------------- Basemap-veksling ----------------
+    const basemapList = document.getElementById("basemap-list");
+    BASEMAPS.forEach(function (bm, i) {
+      const wrap = document.createElement("label");
+      wrap.className = "basemap-option";
+      wrap.innerHTML =
+        '<input type="radio" name="basemap" value="' + i + '"' + (i === 0 ? " checked" : "") + '>' +
+        '<span>' + bm.title + '</span>';
+      basemapList.appendChild(wrap);
+    });
+
+    basemapList.addEventListener("change", function (e) {
+      const bm = BASEMAPS[parseInt(e.target.value, 10)];
+      if (!bm) return;
+      const newBasemap = buildBasemap(bm);
+      if (newBasemap) map.basemap = newBasemap;
+    });
+
+    // ---------------- Zoom til min posisjon ----------------
+    function zoomToMyLocation() {
+      if (!("geolocation" in navigator)) return;
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        view.goTo({
+          target: new Point({
+            longitude: pos.coords.longitude,
+            latitude: pos.coords.latitude,
+            spatialReference: { wkid: 4326 }
+          }),
+          zoom: 16
+        });
+      }, function (err) {
+        console.warn("Kunne ikke hente posisjon", err);
+      }, { enableHighAccuracy: true, timeout: 15000 });
+    }
+    document.getElementById("menu-zoom-btn").addEventListener("click", function () {
+      zoomToMyLocation();
+      // Den blå prikken slås på samtidig, så man ser hvor man er etter zoomen
+      startLocationTracking();
+      closeMenu();
+    });
+
+    // ---------------- Live posisjonssporing (blå prikk) ----------------
+    const locateBtn = document.getElementById("locate-btn");
+    let watchId = null;
+
+    function setLocationDot(lon, lat) {
+      locationGraphicsLayer.removeAll();
+      locationGraphicsLayer.add(new Graphic({
+        geometry: new Point({ longitude: lon, latitude: lat, spatialReference: { wkid: 4326 } }),
+        symbol: {
+          type: "simple-marker",
+          style: "circle",
+          color: [33, 133, 255, 0.9],
+          size: 14,
+          outline: { color: [255, 255, 255, 1], width: 2 }
+        }
+      }));
+    }
+
+    function startLocationTracking() {
+      if (watchId !== null || !("geolocation" in navigator)) return;
+      locateBtn.classList.add("active");
+      watchId = navigator.geolocation.watchPosition(function (pos) {
+        setLocationDot(pos.coords.longitude, pos.coords.latitude);
+      }, function (err) {
+        console.warn("Posisjonssporing feilet", err);
+        locateBtn.classList.remove("active");
+        watchId = null;
+      }, { enableHighAccuracy: true, maximumAge: 5000 });
+    }
+
+    locateBtn.addEventListener("click", function () {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        locationGraphicsLayer.removeAll();
+        locateBtn.classList.remove("active");
+        return;
+      }
+      startLocationTracking();
+    });
+  });
+})();
+</script>
+</body>
+</html>
