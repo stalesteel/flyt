@@ -9,20 +9,14 @@ når endringer pushes til `main`.
 | Adresse | Hva det er |
 |---|---|
 | `/` | Kartet |
-| `/sjekkliste` | Gammel sjekklistefunksjon — **utgått**, se under |
 
 ## Gjenstår å rydde
 
 Sjekklistene er flyttet ut i en egen app på <https://husk.klommestein.no>, og knappene
-i kartmenyen peker dit. Følgende henger igjen og kan fjernes:
-
-1. **Mappen `sjekkliste/` i dette repoet.** Den er ikke lenket fra noe sted lenger, men
-   svarer fortsatt på direkte adresse. Trygt å slette — filene ligger i git-historikken.
-2. **ArcGIS-tabellen `SjekklisteFlyt`.** Denne slettingen kan ikke angres. Innholdet er
-   trygt uansett: alle 22 punktene ligger både i Husk og i `DESIGN.md` i husk-repoet.
-   Vent gjerne til Husk er prøvd noen ganger i praksis.
-3. **Avsnittet «Sjekklister» lenger ned i denne README-en**, som beskriver den gamle
-   løsningen, bør fjernes samtidig.
+i kartmenyen peker dit. Det eneste som henger igjen er **ArcGIS-tabellen
+`SjekklisteFlyt`**, som ikke brukes lenger. Denne slettingen kan ikke angres. Innholdet er
+trygt uansett: alle 22 punktene ligger både i Husk og i `DESIGN.md` i husk-repoet.
+Vent gjerne til Husk er prøvd noen ganger i praksis.
 
 ## Tilgangssperre
 
@@ -35,8 +29,8 @@ Innloggingen huskes i 90 dager i nettleseren.
 Dette er en **dørmatte, ikke en lås**. GitHub Pages serverer bare statiske filer, så det
 finnes ingen server å gjøre sjekken på — alt skjer i nettleseren. I tillegg er repoet
 offentlig, så hvem som helst kan lese `index.html` og resten av kildekoden direkte på
-GitHub uansett hva innloggingssiden sier. Selve sjekklistene ligger i ArcGIS, men den
-tjenesten er delt offentlig og kan leses av den som kjenner URL-en.
+GitHub uansett hva innloggingssiden sier. Kartdataene ligger i ArcGIS, men tjenestene
+er delt offentlig og kan leses av den som kjenner URL-en.
 
 Sperren holder tilfeldige besøkende ute. Den stopper ingen som åpner utviklerverktøy
 eller finner repoet. Legg derfor **aldri noe sensitivt** i disse filene.
@@ -60,57 +54,6 @@ skal skrives med små bokstaver. Endrer du `SALT`, må hashen regnes ut på nytt
 
 Alle som allerede er innlogget forblir innlogget til de 90 dagene løper ut. Vil du kaste
 alle ut umiddelbart, bytt også `STORAGE_KEY` i `auth.js`.
-
-## Sjekklister
-
-### Hvor innholdet ligger
-
-Sjekklistene lagres i en **hosted table i ArcGIS Online**, ikke i repoet. Det er grunnen
-til at `/sjekkliste/admin` kan lagre direkte fra mobilen — GitHub Pages er statisk og kan
-ikke ta imot noe som helst.
-
-Tjenesten: `SjekklisteFlyt/FeatureServer/0`
-(URL-en står i [`sjekkliste/sjekkliste-data.js`](sjekkliste/sjekkliste-data.js).)
-
-Én rad per sjekkpunkt, med disse feltene:
-
-| Felt | Type | Hva det er |
-|---|---|---|
-| `ListeId` | String (50) | Knytter punktet til en sjekkliste |
-| `ListeNavn` | String (100) | Navnet på listen, likt på alle radene i den |
-| `Tittel` | String (200) | Overskriften på punktet |
-| `Beskrivelse` | String (1000) | Teksten under overskriften |
-| `Rekkefolge` | Integer | Rekkefølgen punktet vises i |
-
-Bildet ligger som **attachment** på raden. Laget må ha attachments påslått, og Add,
-Update og Delete tillatt under Editing.
-
-En sjekkliste finnes bare så lenge den har minst ett punkt, siden navnet ligger på radene.
-Sletter du alle punktene, forsvinner listen.
-
-Avkrysninger lagres ikke noe sted — en liste starter alltid blank.
-
-### Bilder
-
-Bilder legges inn fra admin, også rett fra mobilkameraet. De skaleres ned til maks
-1400 piksler og komprimeres til JPG før opplasting.
-
-- **Motivet må ligge i øverste halvdel.** Bildet fyller hele skjermen og beskjæres fra
-  toppen, og den nederste tredjedelen dekkes av tekstbåndet.
-- Stående format passer best.
-- Mangler bildet, vises en nøytral mørk bakgrunn i stedet for et ødelagt bilde.
-
-### Redigere sjekklistene
-
-`/sjekkliste/admin` lar deg opprette og slette lister, legge til og endre punkter, flytte
-punkter opp og ned, og bytte bilde. **Alt lagres med én gang** og er synlig på
-`/sjekkliste` umiddelbart. Tekstfelt lagres når du forlater feltet, ikke for hvert tastetrykk.
-
-Merk at tabellen tar imot endringer fra hvem som helst som kommer gjennom innloggingen,
-uten videre autentisering mot ArcGIS — samme oppsett som interessepunktene i kartet.
-
-Startinnholdet ble lagt inn i tjenesten én gang via REST. Det finnes ingen JSON-fil i
-repoet lenger — all redigering skjer i admin.
 
 ## Kartet
 
